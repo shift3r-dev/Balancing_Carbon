@@ -961,6 +961,728 @@ app.get(
   }
 );
 
+// ============================================================
+// FACILITY TYPES
+// ============================================================
+
+interface Facility {
+  id: string;
+  organisation_id: string | null;
+  name: string;
+  location: string;
+  industry_type: string;
+  production_output: number;
+  production_unit: string;
+  reporting_period: string;
+  electricity_consumption: number;
+  fuel_consumption: number;
+  fuel_type: string;
+  renewable_energy_usage: number;
+  emissions_scope_1: number;
+  emissions_scope_2: number;
+  carbon_intensity: number;
+  esg_readiness_status: string;
+}
+
+interface FacilityRequestBody {
+  name?: unknown;
+  location?: unknown;
+  industry_type?: unknown;
+  industryType?: unknown;
+  production_output?: unknown;
+  productionOutput?: unknown;
+  production_unit?: unknown;
+  productionUnit?: unknown;
+  reporting_period?: unknown;
+  reportingPeriod?: unknown;
+  electricity_consumption?: unknown;
+  electricityConsumption?: unknown;
+  fuel_consumption?: unknown;
+  fuelConsumption?: unknown;
+  fuel_type?: unknown;
+  fuelType?: unknown;
+  renewable_energy_usage?: unknown;
+  renewableEnergyUsage?: unknown;
+  emissions_scope_1?: unknown;
+  emissionsScope1?: unknown;
+  emissions_scope_2?: unknown;
+  emissionsScope2?: unknown;
+  carbon_intensity?: unknown;
+  carbonIntensity?: unknown;
+  esg_readiness_status?: unknown;
+  esgReadinessStatus?: unknown;
+}
+
+
+// ============================================================
+// FACILITY HELPERS
+// ============================================================
+
+async function getAuthenticatedProfile(
+  userId: string
+): Promise<Profile> {
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .select(`
+      id,
+      full_name,
+      organisation_id,
+      role,
+      created_at
+    `)
+    .eq('id', userId)
+    .single<Profile>();
+
+  if (error || !profile) {
+    console.error(
+      'Authenticated profile lookup failed:',
+      error
+    );
+
+    throw new Error(
+      'Authenticated user profile could not be loaded.'
+    );
+  }
+
+  return profile;
+}
+
+
+function getStringValue(
+  primary: unknown,
+  alternate?: unknown
+): string {
+  const value =
+    typeof primary === 'string'
+      ? primary
+      : typeof alternate === 'string'
+        ? alternate
+        : '';
+
+  return value.trim();
+}
+
+
+function getNumericValue(
+  primary: unknown,
+  alternate?: unknown
+): number {
+  const rawValue =
+    primary !== undefined && primary !== null
+      ? primary
+      : alternate;
+
+  if (
+    rawValue === undefined ||
+    rawValue === null ||
+    rawValue === ''
+  ) {
+    return 0;
+  }
+
+  const numericValue = Number(rawValue);
+
+  return Number.isFinite(numericValue)
+    ? numericValue
+    : 0;
+}
+
+
+// ============================================================
+// GET FACILITIES
+// ============================================================
+
+app.get(
+  '/api/facilities',
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      const profile = await getAuthenticatedProfile(
+        req.authUser!.id
+      );
+
+      const { data: facilities, error } =
+        await supabaseAdmin
+          .from('facilities')
+          .select('*')
+          .eq(
+            'organisation_id',
+            profile.organisation_id
+          );
+
+      if (error) {
+        console.error(
+          'Facility listing failed:',
+          error
+        );
+
+        return res.status(500).json({
+          error: `Failed to load facilities: ${error.message}`,
+        });
+      }
+
+      return res.status(200).json({
+        facilities: facilities ?? [],
+      });
+    } catch (error) {
+      console.error(
+        'GET /api/facilities failed:',
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to load facilities.',
+      });
+    }
+  }
+);
+
+
+// ============================================================
+// CREATE FACILITY
+// ============================================================
+
+app.post(
+  '/api/facilities',
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      const profile = await getAuthenticatedProfile(
+        req.authUser!.id
+      );
+
+      const body =
+        req.body as FacilityRequestBody;
+
+      const name = getStringValue(body.name);
+
+      const location = getStringValue(
+        body.location
+      );
+
+      const industryType = getStringValue(
+        body.industry_type,
+        body.industryType
+      );
+
+      const productionUnit = getStringValue(
+        body.production_unit,
+        body.productionUnit
+      );
+
+      const reportingPeriod = getStringValue(
+        body.reporting_period,
+        body.reportingPeriod
+      );
+
+      const fuelType = getStringValue(
+        body.fuel_type,
+        body.fuelType
+      );
+
+      const esgReadinessStatus =
+        getStringValue(
+          body.esg_readiness_status,
+          body.esgReadinessStatus
+        );
+
+
+      // Validate required text fields.
+
+      const missingFields: string[] = [];
+
+      if (!name) {
+        missingFields.push('name');
+      }
+
+      if (!location) {
+        missingFields.push('location');
+      }
+
+      if (!industryType) {
+        missingFields.push('industry_type');
+      }
+
+      if (!productionUnit) {
+        missingFields.push('production_unit');
+      }
+
+      if (!reportingPeriod) {
+        missingFields.push('reporting_period');
+      }
+
+      if (!fuelType) {
+        missingFields.push('fuel_type');
+      }
+
+
+      if (missingFields.length > 0) {
+        return res.status(400).json({
+          error: `Missing required facility fields: ${missingFields.join(', ')}`,
+        });
+      }
+
+
+      const facilityId =
+        `fac-${randomUUID()}`;
+
+
+      const facilityToInsert = {
+        id: facilityId,
+
+        organisation_id:
+          profile.organisation_id,
+
+        name,
+
+        location,
+
+        industry_type: industryType,
+
+        production_output:
+          getNumericValue(
+            body.production_output,
+            body.productionOutput
+          ),
+
+        production_unit:
+          productionUnit,
+
+        reporting_period:
+          reportingPeriod,
+
+        electricity_consumption:
+          getNumericValue(
+            body.electricity_consumption,
+            body.electricityConsumption
+          ),
+
+        fuel_consumption:
+          getNumericValue(
+            body.fuel_consumption,
+            body.fuelConsumption
+          ),
+
+        fuel_type:
+          fuelType,
+
+        renewable_energy_usage:
+          getNumericValue(
+            body.renewable_energy_usage,
+            body.renewableEnergyUsage
+          ),
+
+        emissions_scope_1:
+          getNumericValue(
+            body.emissions_scope_1,
+            body.emissionsScope1
+          ),
+
+        emissions_scope_2:
+          getNumericValue(
+            body.emissions_scope_2,
+            body.emissionsScope2
+          ),
+
+        carbon_intensity:
+          getNumericValue(
+            body.carbon_intensity,
+            body.carbonIntensity
+          ),
+
+        esg_readiness_status:
+          esgReadinessStatus || 'Not Assessed',
+      };
+
+
+      console.log(
+        'Creating facility:',
+        facilityToInsert
+      );
+
+
+      const { data: facility, error } =
+        await supabaseAdmin
+          .from('facilities')
+          .insert(facilityToInsert)
+          .select('*')
+          .single<Facility>();
+
+
+      if (error || !facility) {
+        console.error(
+          'Facility creation failed:',
+          error
+        );
+
+        return res.status(500).json({
+          error: `Failed to create facility: ${
+            error?.message ??
+            'Unknown database error'
+          }`,
+        });
+      }
+
+
+      return res.status(201).json({
+        success: true,
+        facility,
+      });
+    } catch (error) {
+      console.error(
+        'POST /api/facilities failed:',
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to create facility.',
+      });
+    }
+  }
+);
+
+
+// ============================================================
+// UPDATE FACILITY
+// ============================================================
+
+app.patch(
+  '/api/facilities/:id',
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      const profile = await getAuthenticatedProfile(
+        req.authUser!.id
+      );
+
+      const facilityId = req.params.id;
+
+      const body =
+        req.body as FacilityRequestBody;
+
+      const updates: Record<
+        string,
+        string | number
+      > = {};
+
+
+      if (body.name !== undefined) {
+        const value =
+          getStringValue(body.name);
+
+        if (!value) {
+          return res.status(400).json({
+            error:
+              'Facility name cannot be empty.',
+          });
+        }
+
+        updates.name = value;
+      }
+
+
+      if (body.location !== undefined) {
+        const value =
+          getStringValue(body.location);
+
+        if (!value) {
+          return res.status(400).json({
+            error:
+              'Facility location cannot be empty.',
+          });
+        }
+
+        updates.location = value;
+      }
+
+
+      if (
+        body.industry_type !== undefined ||
+        body.industryType !== undefined
+      ) {
+        updates.industry_type =
+          getStringValue(
+            body.industry_type,
+            body.industryType
+          );
+      }
+
+
+      if (
+        body.production_output !== undefined ||
+        body.productionOutput !== undefined
+      ) {
+        updates.production_output =
+          getNumericValue(
+            body.production_output,
+            body.productionOutput
+          );
+      }
+
+
+      if (
+        body.production_unit !== undefined ||
+        body.productionUnit !== undefined
+      ) {
+        updates.production_unit =
+          getStringValue(
+            body.production_unit,
+            body.productionUnit
+          );
+      }
+
+
+      if (
+        body.reporting_period !== undefined ||
+        body.reportingPeriod !== undefined
+      ) {
+        updates.reporting_period =
+          getStringValue(
+            body.reporting_period,
+            body.reportingPeriod
+          );
+      }
+
+
+      if (
+        body.electricity_consumption !== undefined ||
+        body.electricityConsumption !== undefined
+      ) {
+        updates.electricity_consumption =
+          getNumericValue(
+            body.electricity_consumption,
+            body.electricityConsumption
+          );
+      }
+
+
+      if (
+        body.fuel_consumption !== undefined ||
+        body.fuelConsumption !== undefined
+      ) {
+        updates.fuel_consumption =
+          getNumericValue(
+            body.fuel_consumption,
+            body.fuelConsumption
+          );
+      }
+
+
+      if (
+        body.fuel_type !== undefined ||
+        body.fuelType !== undefined
+      ) {
+        updates.fuel_type =
+          getStringValue(
+            body.fuel_type,
+            body.fuelType
+          );
+      }
+
+
+      if (
+        body.renewable_energy_usage !== undefined ||
+        body.renewableEnergyUsage !== undefined
+      ) {
+        updates.renewable_energy_usage =
+          getNumericValue(
+            body.renewable_energy_usage,
+            body.renewableEnergyUsage
+          );
+      }
+
+
+      if (
+        body.emissions_scope_1 !== undefined ||
+        body.emissionsScope1 !== undefined
+      ) {
+        updates.emissions_scope_1 =
+          getNumericValue(
+            body.emissions_scope_1,
+            body.emissionsScope1
+          );
+      }
+
+
+      if (
+        body.emissions_scope_2 !== undefined ||
+        body.emissionsScope2 !== undefined
+      ) {
+        updates.emissions_scope_2 =
+          getNumericValue(
+            body.emissions_scope_2,
+            body.emissionsScope2
+          );
+      }
+
+
+      if (
+        body.carbon_intensity !== undefined ||
+        body.carbonIntensity !== undefined
+      ) {
+        updates.carbon_intensity =
+          getNumericValue(
+            body.carbon_intensity,
+            body.carbonIntensity
+          );
+      }
+
+
+      if (
+        body.esg_readiness_status !== undefined ||
+        body.esgReadinessStatus !== undefined
+      ) {
+        updates.esg_readiness_status =
+          getStringValue(
+            body.esg_readiness_status,
+            body.esgReadinessStatus
+          );
+      }
+
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          error:
+            'No valid facility fields provided.',
+        });
+      }
+
+
+      const { data: facility, error } =
+        await supabaseAdmin
+          .from('facilities')
+          .update(updates)
+          .eq('id', facilityId)
+          .eq(
+            'organisation_id',
+            profile.organisation_id
+          )
+          .select('*')
+          .single<Facility>();
+
+
+      if (error || !facility) {
+        console.error(
+          'Facility update failed:',
+          error
+        );
+
+        return res.status(500).json({
+          error: `Failed to update facility: ${
+            error?.message ??
+            'Unknown database error'
+          }`,
+        });
+      }
+
+
+      return res.status(200).json({
+        success: true,
+        facility,
+      });
+    } catch (error) {
+      console.error(
+        'PATCH /api/facilities/:id failed:',
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to update facility.',
+      });
+    }
+  }
+);
+
+
+// ============================================================
+// DELETE FACILITY
+// ============================================================
+
+app.delete(
+  '/api/facilities/:id',
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      const profile = await getAuthenticatedProfile(
+        req.authUser!.id
+      );
+
+      const facilityId = req.params.id;
+
+
+      const { data: deletedFacility, error } =
+        await supabaseAdmin
+          .from('facilities')
+          .delete()
+          .eq('id', facilityId)
+          .eq(
+            'organisation_id',
+            profile.organisation_id
+          )
+          .select('id')
+          .maybeSingle();
+
+
+      if (error) {
+        console.error(
+          'Facility deletion failed:',
+          error
+        );
+
+        return res.status(500).json({
+          error: `Failed to delete facility: ${error.message}`,
+        });
+      }
+
+
+      if (!deletedFacility) {
+        return res.status(404).json({
+          error:
+            'Facility not found or you do not have access to it.',
+        });
+      }
+
+
+      return res.status(200).json({
+        success: true,
+        deletedFacilityId: facilityId,
+      });
+    } catch (error) {
+      console.error(
+        'DELETE /api/facilities/:id failed:',
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete facility.',
+      });
+    }
+  }
+);
 
 // ============================================================
 // 404 API HANDLER
