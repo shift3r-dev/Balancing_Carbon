@@ -156,7 +156,9 @@ export interface DBState {
   auditLogs: AuditLog[];
 }
 
-const DB_FILE_PATH = path.join(process.cwd(), 'database.json');
+const DB_FILE_PATH = process.env.VERCEL === '1'
+  ? path.join('/tmp', 'database.json')
+  : path.join(process.cwd(), 'database.json');
 
 // Default Indian Industrial Seeding
 const DEFAULT_ORG_ID = 'org-apex';
@@ -553,8 +555,19 @@ export class Database {
 
   private load(): DBState {
     try {
-      if (fs.existsSync(DB_FILE_PATH)) {
-        const data = fs.readFileSync(DB_FILE_PATH, 'utf-8');
+      const localBundledPath = path.join(process.cwd(), 'database.json');
+      let sourcePath = DB_FILE_PATH;
+
+      // On Vercel, if the writeable /tmp/database.json doesn't exist yet,
+      // load from the read-only bundled database.json first to seed the state.
+      if (process.env.VERCEL === '1' && !fs.existsSync(DB_FILE_PATH)) {
+        if (fs.existsSync(localBundledPath)) {
+          sourcePath = localBundledPath;
+        }
+      }
+
+      if (fs.existsSync(sourcePath)) {
+        const data = fs.readFileSync(sourcePath, 'utf-8');
         const parsed = JSON.parse(data);
         if (!parsed.users) {
           parsed.users = [...initialSeed.users];

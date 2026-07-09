@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import { db, calculateEmissions } from './server/db.js';
+import { db, calculateEmissions } from './server/db';
 import { GoogleGenAI } from '@google/genai';
 
 // Load environment variables
