@@ -62,54 +62,64 @@ function getOrgId(req: express.Request): string {
 
 // Real registration / signup endpoint
 app.post('/api/auth/signup', (req, res) => {
-  const { name, email, password, organisationName } = req.body;
-  if (!name || !email || !password || !organisationName) {
-    return res.status(400).json({ error: 'All fields are required.' });
-  }
+  try {
+    const { name, email, password, organisationName } = req.body;
+    if (!name || !email || !password || !organisationName) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
 
-  const existing = db.getUserByEmail(email);
-  if (existing) {
-    return res.status(400).json({ error: 'A user with this corporate email already exists.' });
-  }
+    const existing = db.getUserByEmail(email);
+    if (existing) {
+      return res.status(400).json({ error: 'A user with this corporate email already exists.' });
+    }
 
-  const result = db.addUser(name, email, password, organisationName);
-  res.status(201).json({
-    authenticated: true,
-    user: {
-      id: result.user.id,
-      name: result.user.name,
-      email: result.user.email,
-      role: result.user.role,
-      organisationId: result.user.organisationId
-    },
-    organisation: result.organisation
-  });
+    const result = db.addUser(name, email, password, organisationName);
+    res.status(201).json({
+      authenticated: true,
+      user: {
+        id: result.user.id,
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role,
+        organisationId: result.user.organisationId
+      },
+      organisation: result.organisation
+    });
+  } catch (error: any) {
+    console.error('Signup error:', error);
+    res.status(500).json({ error: `Registration failed: ${error.message || error}` });
+  }
 });
 
 // Real login endpoint
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required.' });
-  }
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
 
-  const user = db.getUserByEmail(email);
-  if (!user || user.passwordHash !== password) {
-    return res.status(401).json({ error: 'Invalid corporate email or secure password.' });
-  }
+    const user = db.getUserByEmail(email);
+    if (!user || user.passwordHash !== password) {
+      return res.status(401).json({ error: 'Invalid corporate email or secure password.' });
+    }
 
-  const organisation = db.getOrganisation(user.organisationId);
-  res.json({
-    authenticated: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      organisationId: user.organisationId
-    },
-    organisation
-  });
+    const organisation = db.getOrganisation(user.organisationId);
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        organisationId: user.organisationId
+      },
+      organisation
+    });
+  } catch (error: any) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: `Login failed: ${error.message || error}` });
+  }
 });
 
 // Dynamic session lookup

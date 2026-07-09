@@ -555,7 +555,19 @@ export class Database {
 
   private load(): DBState {
     try {
-      const localBundledPath = path.join(process.cwd(), 'database.json');
+      let localBundledPath = path.join(process.cwd(), 'database.json');
+      if (!fs.existsSync(localBundledPath)) {
+        const parentPath = path.join(process.cwd(), '..', 'database.json');
+        if (fs.existsSync(parentPath)) {
+          localBundledPath = parentPath;
+        } else {
+          const varTaskPath = '/var/task/database.json';
+          if (fs.existsSync(varTaskPath)) {
+            localBundledPath = varTaskPath;
+          }
+        }
+      }
+
       let sourcePath = DB_FILE_PATH;
 
       // On Vercel, if the writeable /tmp/database.json doesn't exist yet,
