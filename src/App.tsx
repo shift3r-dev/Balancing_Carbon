@@ -31,7 +31,13 @@ export default function App() {
   });
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('balancing_carbon_session');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    try {
+      const session = JSON.parse(saved);
+      return session.user ?? session; // backward compatibility with legacy stored user-only sessions
+    } catch {
+      return null;
+    }
   });
   
   // Login & Signup credentials states
@@ -76,9 +82,12 @@ export default function App() {
           '/api/reports'
         ];
 
-        const headers = {
-          'X-User-Id': currentUser.id
-        };
+        const savedSession = localStorage.getItem('balancing_carbon_session');
+        const session = savedSession ? JSON.parse(savedSession) : null;
+        const token = session?.token ?? session?.accessToken;
+        const headers: Record<string, string> = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
 
         const responses = await Promise.all(endpoints.map(url => fetch(url, { headers })));
 
@@ -108,7 +117,7 @@ export default function App() {
         const repData = await safeJson(responses[6], []);
 
         setOrganisation(orgData);
-        setFacilities(facData);
+        setFacilities(Array.isArray(facData) ? facData : (facData?.facilities ?? []));
         setRecords(energyData);
         setEsgQuestions(esgData);
         setOemSurveys(oemData);
@@ -131,8 +140,11 @@ export default function App() {
         'Content-Type': 'application/json',
       } as Record<string, string>;
 
-      if (currentUser) {
-        headers['X-User-Id'] = currentUser.id;
+      const savedSession = localStorage.getItem('balancing_carbon_session');
+      const session = savedSession ? JSON.parse(savedSession) : null;
+      const token = session?.token ?? session?.accessToken;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
       }
 
       const res = await fetch(url, {
@@ -169,7 +181,7 @@ export default function App() {
       
       // reload lists to reflect computed emissions & scores
       const freshFacs = await safeFetchJson('/api/facilities', undefined, []);
-      setFacilities(freshFacs);
+      setFacilities(Array.isArray(freshFacs) ? freshFacs : (freshFacs?.facilities ?? []));
     } catch (err) {
       console.error(err);
     }
@@ -178,7 +190,7 @@ export default function App() {
   const handleUpdateFacility = async (id: string, payload: any) => {
     try {
       const updated = await safeFetchJson(`/api/facilities/${id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
@@ -188,7 +200,7 @@ export default function App() {
       
       // reload list to capture recalculations
       const freshFacs = await safeFetchJson('/api/facilities', undefined, []);
-      setFacilities(freshFacs);
+      setFacilities(Array.isArray(freshFacs) ? freshFacs : (freshFacs?.facilities ?? []));
     } catch (err) {
       console.error(err);
     }
@@ -196,7 +208,8 @@ export default function App() {
 
   const handleDeleteFacility = async (id: string) => {
     try {
-      await fetch(`/api/facilities/${id}`, { method: 'DELETE' });
+      const deleted = await safeFetchJson(`/api/facilities/${id}`, { method: 'DELETE' }, { success: true });
+      if (!deleted) return;
       setFacilities(prev => prev.filter(f => f.id !== id));
     } catch (err) {
       console.error(err);
@@ -217,7 +230,7 @@ export default function App() {
       // Trigger recalculation reload across facilities
       const facData = await safeFetchJson('/api/facilities', undefined, []);
       const energyData = await safeFetchJson('/api/energy', undefined, []);
-      setFacilities(facData);
+      setFacilities(Array.isArray(facData) ? facData : (facData?.facilities ?? []));
       setRecords(energyData);
     } catch (err) {
       console.error(err);
@@ -256,7 +269,7 @@ export default function App() {
 
   const handleApproveOEMQuestion = async (surveyId: string, questionId: string, status: any, suggestedAnswer?: string) => {
     try {
-      await fetch(`/api/oem-surveys/${surveyId}/approve-question`, {
+      await safeFetchJson(`/api/oem-surveys/${surveyId}/approve-question`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questionId, status, suggestedAnswer })
@@ -287,7 +300,8 @@ export default function App() {
 
   const handleDeleteDocument = async (id: string) => {
     try {
-      await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+      const deleted = await safeFetchJson(`/api/documents/${id}`, { method: 'DELETE' }, { success: true });
+      if (!deleted) return;
       setDocuments(prev => prev.filter(d => d.id !== id));
     } catch (err) {
       console.error(err);
@@ -347,7 +361,7 @@ export default function App() {
       }
 
       const session = await res.json();
-      localStorage.setItem('balancing_carbon_session', JSON.stringify(session.user));
+      localStorage.setItem('balancing_carbon_session', JSON.stringify(session));
       setCurrentUser(session.user);
       setOrganisation(session.organisation);
       setAuthenticated(true);
@@ -386,7 +400,7 @@ export default function App() {
       }
 
       const session = await res.json();
-      localStorage.setItem('balancing_carbon_session', JSON.stringify(session.user));
+      localStorage.setItem('balancing_carbon_session', JSON.stringify(session));
       setCurrentUser(session.user);
       setOrganisation(session.organisation);
       setAuthenticated(true);
@@ -419,7 +433,13 @@ export default function App() {
 
   // Custom Company Profile Subview inside Dashboard
   const renderCompanyProfile = () => {
-    if (!organisation) return null;
+    if (!organisation) {
+      return (
+        <div className="bg-white p-6 rounded-xl border border-brand-border text-sm text-gray-500">
+          Organisation profile could not be loaded. Please refresh or sign in again.
+        </div>
+      );
+    }
     return (
       <div className="space-y-6">
         <div className="bg-white p-5 rounded-xl border border-brand-border">
