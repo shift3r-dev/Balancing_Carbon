@@ -1,500 +1,1032 @@
-import express from 'express';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
-import dotenv from 'dotenv';
-import { db, calculateEmissions } from './server/db';
-import { GoogleGenAI } from '@google/genai';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 
-// Load environment variables
-dotenv.config();
+import cors from 'cors';
+import { randomUUID } from 'node:crypto';
+import { createClient, type User } from '@supabase/supabase-js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+// ============================================================
+// ENVIRONMENT VALIDATION
+// ============================================================
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL) {
+  throw new Error(
+    'Missing SUPABASE_URL environment variable.'
+  );
+}
+
+if (!SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing SUPABASE_ANON_KEY environment variable.'
+  );
+}
+
+if (!SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    'Missing SUPABASE_SERVICE_ROLE_KEY environment variable.'
+  );
+}
+
+
+// ============================================================
+// SUPABASE CLIENTS
+// ============================================================
+
+/**
+ * Normal authentication client.
+ *
+ * Used for operations such as:
+ * - signInWithPassword()
+ *
+ * This client uses the Supabase anon key.
+ */
+const supabaseAuth = createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
+
+
+/**
+ * Privileged server-only client.
+ *
+ * IMPORTANT:
+ * Never expose SUPABASE_SERVICE_ROLE_KEY to frontend code.
+ */
+const supabaseAdmin = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
+
+
+// ============================================================
+// EXPRESS APP
+// ============================================================
 
 const app = express();
-const PORT = 3000;
 
-app.use(express.json());
+app.disable('x-powered-by');
 
-// -------------------------------------------------------------
-// Gemini API Configuration & Helper (Lazy Initialized)
-// -------------------------------------------------------------
-let ai: GoogleGenAI | null = null;
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
 
-function getAI(): GoogleGenAI | null {
-  if (!ai) {
-    const key = process.env.GEMINI_API_KEY;
-    if (key && key !== 'MY_GEMINI_API_KEY') {
-      try {
-        ai = new GoogleGenAI({
-          apiKey: key,
-          httpOptions: {
-            headers: {
-              'User-Agent': 'aistudio-build',
-            }
-          }
-        });
-        console.log('Gemini API client initialized successfully.');
-      } catch (e) {
-        console.error('Error initializing Gemini API:', e);
-      }
-    }
-  }
-  return ai;
+app.use(
+  express.json({
+    limit: '10mb',
+  })
+);
+
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface AuthenticatedRequest extends Request {
+  authUser?: User;
 }
 
-// -------------------------------------------------------------
-// Helper to extract organisation ID from custom header
-function getOrgId(req: express.Request): string {
-  const userId = req.headers['x-user-id'] as string;
-  if (userId) {
-    const user = db.getUsers().find(u => u.id === userId);
-    if (user) {
-      return user.organisationId;
-    }
-  }
-  return 'org-apex'; // Fallback to seeded demo tenant
+
+interface Organisation {
+  id: string;
+  name: string;
+
+  industry: string | null;
+  location: string | null;
+  employee_count: number | null;
+  reporting_year: string | null;
+  target_reduction_percent: number | null;
 }
 
-// API Routes
-// -------------------------------------------------------------
 
-// Real registration / signup endpoint
-app.post('/api/auth/signup', (req, res) => {
+interface Profile {
+  id: string;
+  full_name: string;
+  organisation_id: string;
+  role: string;
+  created_at: string;
+}
+
+
+interface SignupRequestBody {
+  name?: unknown;
+  email?: unknown;
+  password?: unknown;
+  organisationName?: unknown;
+}
+
+
+interface LoginRequestBody {
+  email?: unknown;
+  password?: unknown;
+}
+
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function generateOrganisationId(): string {
+  return `org-${randomUUID()}`;
+}
+
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+
+function isValidEmail(email: string): boolean {
+  const emailPattern =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  return emailPattern.test(email);
+}
+
+
+function getBearerToken(req: Request): string | null {
+  const authorization = req.headers.authorization;
+
+  if (!authorization) {
+    return null;
+  }
+
+  const [scheme, token] = authorization.split(' ');
+
+  if (
+    scheme?.toLowerCase() !== 'bearer' ||
+    !token
+  ) {
+    return null;
+  }
+
+  return token.trim();
+}
+
+
+// ============================================================
+// AUTHENTICATION MIDDLEWARE
+// ============================================================
+
+async function requireAuth(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) {
   try {
-    const { name, email, password, organisationName } = req.body;
-    if (!name || !email || !password || !organisationName) {
-      return res.status(400).json({ error: 'All fields are required.' });
-    }
+    const token = getBearerToken(req);
 
-    const existing = db.getUserByEmail(email);
-    if (existing) {
-      return res.status(400).json({ error: 'A user with this corporate email already exists.' });
-    }
-
-    const result = db.addUser(name, email, password, organisationName);
-    res.status(201).json({
-      authenticated: true,
-      user: {
-        id: result.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        role: result.user.role,
-        organisationId: result.user.organisationId
-      },
-      organisation: result.organisation
-    });
-  } catch (error: any) {
-    console.error('Signup error:', error);
-    res.status(500).json({ error: `Registration failed: ${error.message || error}` });
-  }
-});
-
-// Real login endpoint
-app.post('/api/auth/login', (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
-    }
-
-    const user = db.getUserByEmail(email);
-    if (!user || user.passwordHash !== password) {
-      return res.status(401).json({ error: 'Invalid corporate email or secure password.' });
-    }
-
-    const organisation = db.getOrganisation(user.organisationId);
-    res.json({
-      authenticated: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        organisationId: user.organisationId
-      },
-      organisation
-    });
-  } catch (error: any) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: `Login failed: ${error.message || error}` });
-  }
-});
-
-// Dynamic session lookup
-app.get('/api/auth/session', (req, res) => {
-  const userId = req.headers['x-user-id'] as string;
-  if (!userId) {
-    return res.json({ authenticated: false });
-  }
-
-  const user = db.getUsers().find(u => u.id === userId);
-  if (!user) {
-    return res.json({ authenticated: false });
-  }
-
-  res.json({
-    authenticated: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      organisationId: user.organisationId
-    },
-    organisation: db.getOrganisation(user.organisationId)
-  });
-});
-
-// Organisation Profile
-app.get('/api/organisation', (req, res) => {
-  res.json(db.getOrganisation(getOrgId(req)));
-});
-
-app.post('/api/organisation', (req, res) => {
-  const updated = db.updateOrganisation(req.body, getOrgId(req));
-  res.json(updated);
-});
-
-// Facilities Management
-app.get('/api/facilities', (req, res) => {
-  res.json(db.getFacilities(getOrgId(req)));
-});
-
-app.post('/api/facilities', (req, res) => {
-  const { name, location, industryType, productionOutput, productionUnit, reportingPeriod, electricityConsumption, fuelConsumption, fuelType, renewableEnergyUsage } = req.body;
-  if (!name || !location || !industryType) {
-    return res.status(400).json({ error: 'Name, location, and industry type are required.' });
-  }
-  const orgId = getOrgId(req);
-  const newFac = db.addFacility({
-    name,
-    location,
-    industryType,
-    productionOutput: parseFloat(productionOutput) || 0,
-    productionUnit: productionUnit || 'Tonnes',
-    reportingPeriod: reportingPeriod || 'FY 2025-26',
-    electricityConsumption: parseFloat(electricityConsumption) || 0,
-    fuelConsumption: parseFloat(fuelConsumption) || 0,
-    fuelType: fuelType || 'Diesel',
-    renewableEnergyUsage: parseFloat(renewableEnergyUsage) || 0,
-    esgReadinessStatus: 'Good',
-  }, orgId);
-  res.status(201).json(newFac);
-});
-
-app.put('/api/facilities/:id', (req, res) => {
-  const orgId = getOrgId(req);
-  const updated = db.updateFacility(req.params.id, req.body, orgId);
-  if (!updated) {
-    return res.status(404).json({ error: 'Facility not found' });
-  }
-  res.json(updated);
-});
-
-app.delete('/api/facilities/:id', (req, res) => {
-  const orgId = getOrgId(req);
-  const success = db.deleteFacility(req.params.id, orgId);
-  if (!success) {
-    return res.status(404).json({ error: 'Facility not found' });
-  }
-  res.json({ success: true });
-});
-
-// Energy & Fuel Tracking
-app.get('/api/energy', (req, res) => {
-  res.json(db.getEnergyRecords(getOrgId(req)));
-});
-
-app.post('/api/energy', (req, res) => {
-  const { facilityId, date, reportingPeriod, energyType, quantity, unit, sourceDocument, notes } = req.body;
-  if (!facilityId || !energyType || !quantity || !unit) {
-    return res.status(400).json({ error: 'Facility ID, energy type, quantity, and unit are required.' });
-  }
-  const orgId = getOrgId(req);
-  const newRec = db.addEnergyRecord({
-    facilityId,
-    date: date || new Date().toISOString().split('T')[0],
-    reportingPeriod: reportingPeriod || 'FY 2025-26',
-    energyType,
-    quantity: parseFloat(quantity),
-    unit,
-    sourceDocument: sourceDocument || 'Manual Entry',
-    notes: notes || '',
-  }, orgId);
-  res.status(201).json(newRec);
-});
-
-// Calculate test emissions endpoint (dry run)
-app.post('/api/calculate-preview', (req, res) => {
-  const { energyType, quantity } = req.body;
-  if (!energyType || quantity === undefined) {
-    return res.status(400).json({ error: 'Energy type and quantity are required.' });
-  }
-  const result = calculateEmissions(energyType, parseFloat(quantity));
-  res.json(result);
-});
-
-// ESG Readiness Assessments
-app.get('/api/esg', (req, res) => {
-  res.json(db.getESGQuestions(getOrgId(req)));
-});
-
-app.put('/api/esg/:id', (req, res) => {
-  const orgId = getOrgId(req);
-  const updated = db.updateESGQuestion(req.params.id, req.body, orgId);
-  if (!updated) {
-    return res.status(404).json({ error: 'Assessment question not found' });
-  }
-  res.json(updated);
-});
-
-// OEM Questionnaire Module
-app.get('/api/oem-surveys', (req, res) => {
-  res.json(db.getOEMQuestionnaires(getOrgId(req)));
-});
-
-app.post('/api/oem-surveys', (req, res) => {
-  const { title, oemName, dueDate } = req.body;
-  if (!title || !oemName || !dueDate) {
-    return res.status(400).json({ error: 'Survey title, OEM name, and due date are required.' });
-  }
-  const orgId = getOrgId(req);
-  const survey = db.addOEMQuestionnaire(title, oemName, dueDate, orgId);
-  res.status(201).json(survey);
-});
-
-app.put('/api/oem-surveys/:id', (req, res) => {
-  const orgId = getOrgId(req);
-  const updated = db.updateOEMQuestionnaire(req.params.id, req.body, orgId);
-  if (!updated) {
-    return res.status(404).json({ error: 'OEM survey not found' });
-  }
-  res.json(updated);
-});
-
-app.post('/api/oem-surveys/:id/approve-question', (req, res) => {
-  const { questionId, status, suggestedAnswer } = req.body;
-  if (!questionId || !status) {
-    return res.status(400).json({ error: 'Question ID and status are required.' });
-  }
-  const orgId = getOrgId(req);
-  const success = db.updateOEMQuestionStatus(req.params.id, questionId, status, suggestedAnswer, orgId);
-  res.json({ success });
-});
-
-// Document Management
-app.get('/api/documents', (req, res) => {
-  res.json(db.getDocuments(getOrgId(req)));
-});
-
-app.post('/api/documents', (req, res) => {
-  const { name, category, facilityId, period, size, evidenceUsage } = req.body;
-  if (!name || !category) {
-    return res.status(400).json({ error: 'Name and category are required.' });
-  }
-  const orgId = getOrgId(req);
-  const newDoc = db.addDocument({
-    name,
-    category,
-    uploadDate: new Date().toISOString().split('T')[0],
-    facilityId: facilityId || 'fac-mohali',
-    period: period || 'FY 2025-26',
-    size: size || '250 KB',
-    evidenceUsage: evidenceUsage || 'Unassigned',
-  }, orgId);
-  res.status(201).json(newDoc);
-});
-
-app.delete('/api/documents/:id', (req, res) => {
-  const orgId = getOrgId(req);
-  const success = db.deleteDocument(req.params.id, orgId);
-  if (!success) {
-    return res.status(404).json({ error: 'Document not found' });
-  }
-  res.json({ success: true });
-});
-
-// Reports
-app.get('/api/reports', (req, res) => {
-  res.json(db.getReports(getOrgId(req)));
-});
-
-app.post('/api/reports', (req, res) => {
-  const { title, type, period, summary } = req.body;
-  if (!title || !type) {
-    return res.status(400).json({ error: 'Report title and type are required.' });
-  }
-  const orgId = getOrgId(req);
-  const report = db.generateReport(title, type, period || 'FY 2025-26', summary || '', orgId);
-  res.status(201).json(report);
-});
-
-// Audit Logs
-app.get('/api/audit-logs', (req, res) => {
-  res.json(db.getAuditLogs(getOrgId(req)));
-});
-
-// AI Assistant Chatbot with Context
-app.post('/api/ai-assistant', async (req, res) => {
-  const { prompt, conversationTitle } = req.body;
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required.' });
-  }
-
-  const activeTitle = conversationTitle || 'General Discussion';
-  const orgId = getOrgId(req);
-
-  // Extract tenant-specific metrics to pass as context
-  const facilities = db.getFacilities(orgId);
-  const records = db.getEnergyRecords(orgId);
-  const esg = db.getESGQuestions(orgId);
-  const documents = db.getDocuments(orgId);
-  const org = db.getOrganisation(orgId);
-  const orgName = org ? org.name : 'Apex Precision Components Pvt. Ltd.';
-
-  const totalScope1 = facilities.reduce((sum, f) => sum + f.emissionsScope1, 0);
-  const totalScope2 = facilities.reduce((sum, f) => sum + f.emissionsScope2, 0);
-  const totalEmissions = totalScope1 + totalScope2;
-
-  // Compile rich context about the user's specific business state
-  const businessContext = `
-You are Balancing Carbon Intelligence, an elite B2B Sustainability, ESG, carbon audit, and compliance AI expert designed specifically to help Indian manufacturers and exporters.
-You are assisting ${orgName} (based in India).
-
-Here is the accurate live data from their corporate client platform:
-- Total Emissions: ${totalEmissions.toFixed(2)} tCO2e (Scope 1: ${totalScope1.toFixed(2)} tCO2e, Scope 2: ${totalScope2.toFixed(2)} tCO2e)
-- Facilities:
-  ${facilities.map((f, idx) => `* ${f.name} (${f.location}): ${f.industryType}. Scope 1: ${f.emissionsScope1} t, Scope 2: ${f.emissionsScope2} t, Status: ${f.esgReadinessStatus}`).join('\n  ')}
-- Key ESG Readiness Gaps:
-  * Systematic Emission Measurement: Calculated using platform coefficients, but third-party external audit or validation by accredited agencies (e.g. TÜV / SGS) is pending.
-  * Supplier Code of Conduct (child labor & fair wages) is currently a Draft and has NOT been signed or distributed to raw material suppliers (Non-compliant, average score 4/10).
-- Registered documents in the secure vault:
-  ${documents.length > 0 ? documents.map(d => `- ${d.name} (${d.category}) used for ${d.evidenceUsage}`).join('\n  ') : 'No documents uploaded yet.'}
-
-Rules for your response:
-1. Provide highly technical, actionable, realistic compliance recommendations for Indian factories.
-2. Refer directly to their specific facilities, company name, and emission stats above.
-3. Be professional, direct, clear, and objective. Avoid hand-waving "go green" advice. Offer concrete steps like standardizing diesel invoice records or contracting third-party verification agencies.
-4. Mark your response clearly as: "AI-generated analysis — verify before external submission."
-5. Ground your answers in BRSR (Business Responsibility and Sustainability Reporting) standards which are mandated in India.
-`;
-
-  const aiClient = getAI();
-  if (aiClient) {
-    try {
-      const response = await aiClient.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: `${businessContext}\n\nUser Question: ${prompt}`,
+    if (!token) {
+      return res.status(401).json({
+        authenticated: false,
+        error: 'Authentication required.',
       });
+    }
 
-      const aiText = response.text || 'Unable to generate analysis. Please try again.';
+    const {
+      data,
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
 
-      // Save user message
-      db.addAIConversationMessage(activeTitle, { sender: 'user', text: prompt }, orgId);
-      // Save AI message
-      db.addAIConversationMessage(activeTitle, {
-        sender: 'ai',
-        text: aiText,
-        sources: [
-          { title: `${orgName} Emissions Index`, type: 'System Audit' },
-          { title: 'Registered ESG Assessment Gaps', type: 'Compliance Matrix' }
-        ]
-      }, orgId);
+    if (error || !data.user) {
+      console.error(
+        'Token verification failed:',
+        error
+      );
 
-      return res.json({ text: aiText, sources: [
-        { title: `${orgName} Emissions Index`, type: 'System Audit' },
-        { title: 'Registered ESG Assessment Gaps', type: 'Compliance Matrix' }
-      ] });
-    } catch (err: any) {
-      console.error('Error with Gemini API generation:', err);
-      // Fallback below if API fails (e.g. invalid key or network issue)
+      return res.status(401).json({
+        authenticated: false,
+        error:
+          'Invalid or expired authentication token.',
+      });
+    }
+
+    req.authUser = data.user;
+
+    next();
+  } catch (error) {
+    console.error(
+      'Authentication middleware error:',
+      error
+    );
+
+    return res.status(500).json({
+      authenticated: false,
+      error:
+        'Unable to verify authentication.',
+    });
+  }
+}
+
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
+app.get(
+  '/api/health',
+  (_req: Request, res: Response) => {
+    return res.status(200).json({
+      status: 'ok',
+      service: 'Balancing Carbon API',
+      timestamp: new Date().toISOString(),
+    });
+  }
+);
+
+
+// ============================================================
+// SIGN UP
+// ============================================================
+
+app.post(
+  '/api/auth/signup',
+  async (
+    req: Request<
+      Record<string, never>,
+      unknown,
+      SignupRequestBody
+    >,
+    res: Response
+  ) => {
+    let createdUserId: string | null = null;
+
+    let createdOrganisationId:
+      | string
+      | null = null;
+
+    try {
+      const {
+        name,
+        email,
+        password,
+        organisationName,
+      } = req.body;
+
+
+      // --------------------------------------------------------
+      // VALIDATE FULL NAME
+      // --------------------------------------------------------
+
+      if (
+        typeof name !== 'string' ||
+        !name.trim()
+      ) {
+        return res.status(400).json({
+          error: 'Full name is required.',
+        });
+      }
+
+
+      if (name.trim().length > 150) {
+        return res.status(400).json({
+          error:
+            'Full name must not exceed 150 characters.',
+        });
+      }
+
+
+      // --------------------------------------------------------
+      // VALIDATE EMAIL
+      // --------------------------------------------------------
+
+      if (
+        typeof email !== 'string' ||
+        !email.trim()
+      ) {
+        return res.status(400).json({
+          error: 'Email address is required.',
+        });
+      }
+
+      const normalizedEmail =
+        normalizeEmail(email);
+
+      if (!isValidEmail(normalizedEmail)) {
+        return res.status(400).json({
+          error:
+            'Please enter a valid email address.',
+        });
+      }
+
+
+      // --------------------------------------------------------
+      // VALIDATE ORGANISATION
+      // --------------------------------------------------------
+
+      if (
+        typeof organisationName !== 'string' ||
+        !organisationName.trim()
+      ) {
+        return res.status(400).json({
+          error:
+            'Organisation name is required.',
+        });
+      }
+
+      if (
+        organisationName.trim().length > 200
+      ) {
+        return res.status(400).json({
+          error:
+            'Organisation name must not exceed 200 characters.',
+        });
+      }
+
+
+      // --------------------------------------------------------
+      // VALIDATE PASSWORD
+      // --------------------------------------------------------
+
+      if (typeof password !== 'string') {
+        return res.status(400).json({
+          error: 'Password is required.',
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({
+          error:
+            'Password must contain at least 8 characters.',
+        });
+      }
+
+      if (password.length > 128) {
+        return res.status(400).json({
+          error:
+            'Password must not exceed 128 characters.',
+        });
+      }
+
+
+      // --------------------------------------------------------
+      // CREATE SUPABASE AUTH USER
+      // --------------------------------------------------------
+
+      const {
+        data: authData,
+        error: authError,
+      } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: normalizedEmail,
+          password,
+
+          // TEMPORARY:
+          // Suitable for your current dummy/test deployment.
+          // Change this to false later when email verification
+          // is configured.
+          email_confirm: true,
+
+          user_metadata: {
+            full_name: name.trim(),
+
+            organisation_name:
+              organisationName.trim(),
+          },
+        });
+
+
+      if (authError || !authData.user) {
+        console.error(
+          'Supabase user creation failed:',
+          authError
+        );
+
+        const message =
+          authError?.message?.toLowerCase() ?? '';
+
+        if (
+          message.includes('already') ||
+          message.includes('registered') ||
+          message.includes('exists')
+        ) {
+          return res.status(409).json({
+            error:
+              'An account with this email already exists.',
+          });
+        }
+
+        return res.status(400).json({
+          error:
+            authError?.message ||
+            'Unable to create user account.',
+        });
+      }
+
+
+      createdUserId = authData.user.id;
+
+
+      // --------------------------------------------------------
+      // GENERATE ORGANISATION ID
+      // --------------------------------------------------------
+
+      const organisationId =
+        generateOrganisationId();
+
+
+      // --------------------------------------------------------
+      // CREATE ORGANISATION
+      // --------------------------------------------------------
+
+      const {
+        data: organisation,
+        error: organisationError,
+      } = await supabaseAdmin
+        .from('organisations')
+        .insert({
+          id: organisationId,
+          name: organisationName.trim(),
+        })
+        .select(
+          `
+            id,
+            name,
+            industry,
+            location,
+            employee_count,
+            reporting_year,
+            target_reduction_percent
+          `
+        )
+        .single<Organisation>();
+
+
+      if (
+        organisationError ||
+        !organisation
+      ) {
+        throw new Error(
+          `Organisation creation failed: ${
+            organisationError?.message ||
+            'Unknown database error'
+          }`
+        );
+      }
+
+
+      createdOrganisationId =
+        organisation.id;
+
+
+      // --------------------------------------------------------
+      // CREATE PROFILE
+      // --------------------------------------------------------
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          id: createdUserId,
+
+          full_name: name.trim(),
+
+          organisation_id:
+            organisation.id,
+
+          role: 'organisation_admin',
+        })
+        .select(
+          `
+            id,
+            full_name,
+            organisation_id,
+            role,
+            created_at
+          `
+        )
+        .single<Profile>();
+
+
+      if (
+        profileError ||
+        !profile
+      ) {
+        throw new Error(
+          `Profile creation failed: ${
+            profileError?.message ||
+            'Unknown database error'
+          }`
+        );
+      }
+
+
+      // --------------------------------------------------------
+      // AUTOMATIC LOGIN AFTER SIGNUP
+      // --------------------------------------------------------
+
+      const {
+        data: sessionData,
+        error: sessionError,
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+
+      if (sessionError) {
+        console.error(
+          'Automatic login after signup failed:',
+          sessionError
+        );
+      }
+
+
+      // --------------------------------------------------------
+      // SUCCESS RESPONSE
+      // --------------------------------------------------------
+
+      return res.status(201).json({
+        authenticated: Boolean(
+          sessionData.session
+        ),
+
+        accessToken:
+          sessionData.session?.access_token ??
+          null,
+
+        refreshToken:
+          sessionData.session?.refresh_token ??
+          null,
+
+        expiresAt:
+          sessionData.session?.expires_at ??
+          null,
+
+        user: {
+          id: createdUserId,
+
+          name: profile.full_name,
+
+          email: normalizedEmail,
+
+          role: profile.role,
+
+          organisationId:
+            profile.organisation_id,
+        },
+
+        organisation,
+      });
+    } catch (error) {
+      console.error(
+        'Registration failed:',
+        error
+      );
+
+
+      // --------------------------------------------------------
+      // COMPENSATING ROLLBACK
+      // --------------------------------------------------------
+      //
+      // Supabase Auth and database inserts aren't currently
+      // executed as one PostgreSQL transaction.
+      //
+      // Therefore, if a later step fails, clean up earlier
+      // resources so no orphaned account remains.
+      // --------------------------------------------------------
+
+
+      if (createdOrganisationId) {
+        const {
+          error: organisationDeleteError,
+        } = await supabaseAdmin
+          .from('organisations')
+          .delete()
+          .eq(
+            'id',
+            createdOrganisationId
+          );
+
+
+        if (organisationDeleteError) {
+          console.error(
+            'Failed to roll back organisation:',
+            organisationDeleteError
+          );
+        }
+      }
+
+
+      if (createdUserId) {
+        const {
+          error: userDeleteError,
+        } =
+          await supabaseAdmin.auth.admin.deleteUser(
+            createdUserId
+          );
+
+
+        if (userDeleteError) {
+          console.error(
+            'Failed to roll back auth user:',
+            userDeleteError
+          );
+        }
+      }
+
+
+      return res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Registration failed.',
+      });
     }
   }
+);
 
-  // Graceful Sophisticated Fallback (Rules Engine)
-  console.log('Using rule-based contextual fallback responder.');
-  let replyText = '';
-  const lowerPrompt = prompt.toLowerCase();
 
-  if (lowerPrompt.includes('scope 2') || lowerPrompt.includes('increase') || lowerPrompt.includes('electricity')) {
-    replyText = `Based on our emissions inventory, electricity consumption is your largest Scope 2 hotspot. Your intense reliance on standard state grid electricity without rooftop solar offsets is the primary reason why your Scope 2 emissions remain high.
+// ============================================================
+// LOGIN
+// ============================================================
 
-**Recommended Actions:**
-1. **Feasibility Study:** Evaluate rooftop solar deployment at your primary manufacturing unit. 
-2. **Open Access Solar:** Explore procuring green power via third-party open access agreements.
-3. **Energy Audit:** Complete a comprehensive Level-2 energy audit of your heavy stamp and heating lines to optimize machinery idle states.`;
-  } else if (lowerPrompt.includes('missing') || lowerPrompt.includes('document') || lowerPrompt.includes('evidence')) {
-    replyText = `Our document compliance auditor lists several gaps requiring physical evidence uploads:
-1. **Supplier Code of Conduct:** The Supplier Code of Conduct is presently in draft. To resolve compliance gaps (score 4/10), you must upload a copy of the executed/signed agreement from your top suppliers.
-2. **Pollution Board CTO:** Ensure your regional Consent to Operate (CTO) renewal is submitted and the final, approved CTO certificate is uploaded.
-3. **Accredited Verification:** No third-party carbon audit certificate is linked to your emissions reports.`;
-  } else if (lowerPrompt.includes('question') || lowerPrompt.includes('oem') || lowerPrompt.includes('tata')) {
-    replyText = `Regarding the OEM Supplier ESG Survey, the draft answers have been generated with high confidence.
-For question: *"Does your company measure and report Scope 1 & 2 emissions?"*
-**Answer status:** Ready for Review.
-**Evidence mapping:** Linked to active monthly electricity and diesel entries.
-**Action:** Select "Approve Response" in the OEM Questionnaire interface to freeze this response for the export spreadsheet.`;
-  } else {
-    replyText = `I have completed a comprehensive multi-tenant ESG assessment for ${orgName}:
-1. **Scope Breakdown:** Scope 1 emissions represent heavy industrial fuel burning, while Scope 2 represents purchased electricity. Scope 2 is currently your leading carbon contributor.
-2. **BRSR Compliance Gaps:** Your average ESG readiness score is **72%**. Improving this to >85% (Excellent) requires finalizing the Supplier Code of Conduct and completing accredited third-party verification of your energy log books.
-3. **Immediate Recommendation:** Designate a compliance officer to establish energy log auditing guidelines and gather missing bills to secure export shipments.
+app.post(
+  '/api/auth/login',
+  async (
+    req: Request<
+      Record<string, never>,
+      unknown,
+      LoginRequestBody
+    >,
+    res: Response
+  ) => {
+    try {
+      const {
+        email,
+        password,
+      } = req.body;
 
-What specific area would you like to investigate further? I can help with Scope 1 calculations, document verification, or drafting answers for specific OEM compliance surveys.`;
+
+      if (
+        typeof email !== 'string' ||
+        !email.trim()
+      ) {
+        return res.status(400).json({
+          error: 'Email address is required.',
+        });
+      }
+
+
+      if (
+        typeof password !== 'string' ||
+        !password
+      ) {
+        return res.status(400).json({
+          error: 'Password is required.',
+        });
+      }
+
+
+      const normalizedEmail =
+        normalizeEmail(email);
+
+
+      const {
+        data: authData,
+        error: authError,
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        });
+
+
+      if (
+        authError ||
+        !authData.user ||
+        !authData.session
+      ) {
+        console.error(
+          'Login failed:',
+          authError
+        );
+
+        return res.status(401).json({
+          error:
+            'Invalid email or password.',
+        });
+      }
+
+
+      // --------------------------------------------------------
+      // LOAD USER PROFILE
+      // --------------------------------------------------------
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabaseAdmin
+        .from('profiles')
+        .select(
+          `
+            id,
+            full_name,
+            organisation_id,
+            role,
+            created_at
+          `
+        )
+        .eq(
+          'id',
+          authData.user.id
+        )
+        .single<Profile>();
+
+
+      if (
+        profileError ||
+        !profile
+      ) {
+        console.error(
+          'Profile lookup failed:',
+          profileError
+        );
+
+        return res.status(500).json({
+          error:
+            'Your account exists, but its organisation profile could not be loaded.',
+        });
+      }
+
+
+      return res.status(200).json({
+        authenticated: true,
+
+        accessToken:
+          authData.session.access_token,
+
+        refreshToken:
+          authData.session.refresh_token,
+
+        expiresAt:
+          authData.session.expires_at,
+
+        user: {
+          id: authData.user.id,
+
+          name: profile.full_name,
+
+          email: authData.user.email,
+
+          role: profile.role,
+
+          organisationId:
+            profile.organisation_id,
+        },
+      });
+    } catch (error) {
+      console.error(
+        'Unexpected login error:',
+        error
+      );
+
+      return res.status(500).json({
+        error: 'Login failed.',
+      });
+    }
   }
+);
 
-  const formattedResponse = `**AI-generated analysis — verify before external submission.**\n\n${replyText}`;
 
-  db.addAIConversationMessage(activeTitle, { sender: 'user', text: prompt }, orgId);
-  db.addAIConversationMessage(activeTitle, {
-    sender: 'ai',
-    text: formattedResponse,
-    sources: [
-      { title: `${orgName} Emissions Index`, type: 'System Audit' },
-      { title: 'Registered ESG Assessment Gaps', type: 'Compliance Matrix' }
-    ]
-  }, orgId);
+// ============================================================
+// CURRENT USER
+// ============================================================
 
-  res.json({
-    text: formattedResponse,
-    sources: [
-      { title: `${orgName} Emissions Index`, type: 'System Audit' },
-      { title: 'Registered ESG Assessment Gaps', type: 'Compliance Matrix' }
-    ]
-  });
-});
+app.get(
+  '/api/auth/me',
+  requireAuth,
+  async (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      const authUser = req.authUser!;
 
-// -------------------------------------------------------------
-// Dev & Production Serving Modes
-// -------------------------------------------------------------
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-    console.log('Vite middleware mounted in Development mode.');
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-    console.log('Static asset serving mounted in Production mode.');
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await supabaseAdmin
+        .from('profiles')
+        .select(
+          `
+            id,
+            full_name,
+            organisation_id,
+            role,
+            created_at
+          `
+        )
+        .eq(
+          'id',
+          authUser.id
+        )
+        .single<Profile>();
+
+
+      if (
+        profileError ||
+        !profile
+      ) {
+        console.error(
+          'Current-user profile lookup failed:',
+          profileError
+        );
+
+        return res.status(404).json({
+          authenticated: true,
+
+          error:
+            'User profile not found.',
+        });
+      }
+
+
+      return res.status(200).json({
+        authenticated: true,
+
+        user: {
+          id: authUser.id,
+
+          name: profile.full_name,
+
+          email: authUser.email,
+
+          role: profile.role,
+
+          organisationId:
+            profile.organisation_id,
+        },
+      });
+    } catch (error) {
+      console.error(
+        'Failed to load current user:',
+        error
+      );
+
+      return res.status(500).json({
+        error:
+          'Unable to load user profile.',
+      });
+    }
   }
+);
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+
+// ============================================================
+// LOGOUT
+// ============================================================
+
+app.post(
+  '/api/auth/logout',
+  requireAuth,
+  async (
+    _req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    try {
+      /*
+       * With JWT-based authentication, the frontend must
+       * remove its stored access/refresh tokens on logout.
+       *
+       * A future version can implement global server-side
+       * session revocation if required.
+       */
+
+      return res.status(200).json({
+        authenticated: false,
+
+        message:
+          'Logged out successfully. Remove the local session tokens.',
+      });
+    } catch (error) {
+      console.error(
+        'Logout error:',
+        error
+      );
+
+      return res.status(500).json({
+        error: 'Logout failed.',
+      });
+    }
+  }
+);
+
+
+// ============================================================
+// PROTECTED AUTH TEST
+// ============================================================
+
+app.get(
+  '/api/protected',
+  requireAuth,
+  (
+    req: AuthenticatedRequest,
+    res: Response
+  ) => {
+    return res.status(200).json({
+      message:
+        'Authentication successful.',
+
+      userId: req.authUser!.id,
+
+      email: req.authUser!.email,
+    });
+  }
+);
+
+
+// ============================================================
+// 404 API HANDLER
+// ============================================================
+
+app.use(
+  '/api',
+  (
+    req: Request,
+    res: Response
+  ) => {
+    return res.status(404).json({
+      error: 'API endpoint not found.',
+      path: req.originalUrl,
+    });
+  }
+);
+
+
+// ============================================================
+// GLOBAL ERROR HANDLER
+// ============================================================
+
+app.use(
+  (
+    error: Error,
+    _req: Request,
+    res: Response,
+    _next: NextFunction
+  ) => {
+    console.error(
+      'Unhandled server error:',
+      error
+    );
+
+    return res.status(500).json({
+      error: 'Internal server error.',
+    });
+  }
+);
+
+
+// ============================================================
+// LOCAL DEVELOPMENT SERVER
+// ============================================================
+
+if (
+  process.env.NODE_ENV !== 'production' &&
+  !process.env.VERCEL
+) {
+  const PORT = Number(
+    process.env.PORT || 3000
+  );
+
+
+  app.listen(PORT, () => {
+    console.log(
+      `Balancing Carbon API running on port ${PORT}`
+    );
   });
 }
 
-// Export app for serverless platforms like Vercel
+
+// ============================================================
+// VERCEL EXPORT
+// ============================================================
+
+// Required by api/index.ts.
 export default app;
-
-// Only start the server if NOT running in a serverless environment (e.g. Vercel)
-if (process.env.VERCEL !== '1') {
-  startServer();
-}
