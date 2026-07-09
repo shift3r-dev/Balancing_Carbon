@@ -1,0 +1,6 @@
+{
+  "name": "Balancing Carbon",
+  "description": "ESG, Carbon & Compliance Intelligence for Manufacturers. Track Scope 1, 2, and 3 emissions, manage ESG readiness, and streamline OEM supplier questionnaires.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
