@@ -62,6 +62,11 @@ export default function App() {
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [homeScopeType, setHomeScopeType] = useState<'scope-1' | 'scope-2' | 'scope-3'>('scope-1');
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportType, setReportType] = useState('BRSR Core Audit Report');
+  const [reportPeriod, setReportPeriod] = useState('FY 2025-26');
+  const [reportSummary, setReportSummary] = useState('');
+
 
   // Sync state on mount or user changes
   useEffect(() => {
@@ -118,11 +123,11 @@ export default function App() {
 
         setOrganisation(orgData);
         setFacilities(Array.isArray(facData) ? facData : (facData?.facilities ?? []));
-        setRecords(energyData);
-        setEsgQuestions(esgData);
-        setOemSurveys(oemData);
-        setDocuments(docData);
-        setReports(repData);
+        setRecords(Array.isArray(energyData) ? energyData : (energyData?.records ?? []));
+        setEsgQuestions(Array.isArray(esgData) ? esgData : (esgData?.questions ?? []));
+        setOemSurveys(Array.isArray(oemData) ? oemData : (oemData?.surveys ?? []));
+        setDocuments(Array.isArray(docData) ? docData : (docData?.documents ?? []));
+        setReports(Array.isArray(repData) ? repData : (repData?.reports ?? []));
       } catch (err) {
         console.error('Error fetching seeded multi-tenant states:', err);
       } finally {
@@ -167,6 +172,15 @@ export default function App() {
     }
   };
 
+  const unwrapEntity = <T,>(response: any, keys: string[]): T | null => {
+    if (!response) return null;
+    for (const key of keys) {
+      if (response[key] && typeof response[key] === 'object') return response[key] as T;
+    }
+    if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) return response.data as T;
+    return response as T;
+  };
+
   // Sync state helpers
   const handleAddFacility = async (payload: any) => {
     try {
@@ -175,9 +189,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (newFac) {
-        setFacilities(prev => [...prev, newFac]);
-      }
+      const createdFacility = unwrapEntity<Facility>(newFac, ['facility']);
+      if (createdFacility?.id) setFacilities(prev => [...prev, createdFacility]);
       
       // reload lists to reflect computed emissions & scores
       const freshFacs = await safeFetchJson('/api/facilities', undefined, []);
@@ -194,9 +207,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (updated) {
-        setFacilities(prev => prev.map(f => f.id === id ? updated : f));
-      }
+      const updatedFacility = unwrapEntity<Facility>(updated, ['facility']);
+      if (updatedFacility?.id) setFacilities(prev => prev.map(f => f.id === id ? updatedFacility : f));
       
       // reload list to capture recalculations
       const freshFacs = await safeFetchJson('/api/facilities', undefined, []);
@@ -223,15 +235,14 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (newRec) {
-        setRecords(prev => [newRec, ...prev]);
-      }
+      const createdRecord = unwrapEntity<EnergyRecord>(newRec, ['record', 'energyRecord']);
+      if (createdRecord?.id) setRecords(prev => [createdRecord, ...prev]);
 
       // Trigger recalculation reload across facilities
       const facData = await safeFetchJson('/api/facilities', undefined, []);
       const energyData = await safeFetchJson('/api/energy', undefined, []);
       setFacilities(Array.isArray(facData) ? facData : (facData?.facilities ?? []));
-      setRecords(energyData);
+      setRecords(Array.isArray(energyData) ? energyData : (energyData?.records ?? []));
     } catch (err) {
       console.error(err);
     }
@@ -259,9 +270,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, oemName, dueDate })
       });
-      if (newSurvey) {
-        setOemSurveys(prev => [...prev, newSurvey]);
-      }
+      const createdSurvey = unwrapEntity<OEMQuestionnaire>(newSurvey, ['survey', 'questionnaire']);
+      if (createdSurvey?.id) setOemSurveys(prev => [...prev, createdSurvey]);
     } catch (err) {
       console.error(err);
     }
@@ -277,7 +287,7 @@ export default function App() {
 
       // Reload questionnaires to preserve deep updates
       const freshSurveys = await safeFetchJson('/api/oem-surveys', undefined, []);
-      setOemSurveys(freshSurveys);
+      setOemSurveys(Array.isArray(freshSurveys) ? freshSurveys : (freshSurveys?.surveys ?? []));
     } catch (err) {
       console.error(err);
     }
@@ -290,9 +300,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (newDoc) {
-        setDocuments(prev => [newDoc, ...prev]);
-      }
+      const createdDocument = unwrapEntity<Document>(newDoc, ['document']);
+      if (createdDocument?.id) setDocuments(prev => [createdDocument, ...prev]);
     } catch (err) {
       console.error(err);
     }
@@ -330,9 +339,8 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, type, period, summary })
       });
-      if (report) {
-        setReports(prev => [report, ...prev]);
-      }
+      const createdReport = unwrapEntity<any>(report, ['report']);
+      if (createdReport?.id) setReports(prev => [createdReport, ...prev]);
     } catch (err) {
       console.error(err);
     }
@@ -552,17 +560,12 @@ export default function App() {
 
   // Custom Reports Centre Subview
   const renderReportsCentre = () => {
-    const [title, setTitle] = useState('');
-    const [type, setType] = useState('BRSR Core Audit Report');
-    const [period, setPeriod] = useState('FY 2025-26');
-    const [summary, setSummary] = useState('');
-
     const handleCreateReport = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!title) return;
-      handleAddReport(title, type, period, summary);
-      setTitle('');
-      setSummary('');
+      if (!reportTitle) return;
+      handleAddReport(reportTitle, reportType, reportPeriod, reportSummary);
+      setReportTitle('');
+      setReportSummary('');
     };
 
     return (
@@ -585,8 +588,8 @@ export default function App() {
                   required
                   placeholder="e.g. FY25 Carbon Verification Worksheet"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  value={reportTitle}
+                  onChange={(e) => setReportTitle(e.target.value)}
                 />
               </div>
 
@@ -594,8 +597,8 @@ export default function App() {
                 <label className="block text-gray-500 font-mono mb-1">Filing/Audit standard *</label>
                 <select 
                   className="w-full border border-brand-border p-2.5 rounded bg-white text-xs"
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value)}
                 >
                   <option value="BRSR Core Audit Report">BRSR Core Audit Report (SEBI India)</option>
                   <option value="ISO 14064 GHG Statement">ISO 14064 GHG Statement</option>
@@ -610,8 +613,8 @@ export default function App() {
                   type="text" 
                   required
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono"
-                  value={period}
-                  onChange={(e) => setPeriod(e.target.value)}
+                  value={reportPeriod}
+                  onChange={(e) => setReportPeriod(e.target.value)}
                 />
               </div>
 
@@ -621,8 +624,8 @@ export default function App() {
                   rows={3}
                   placeholder="e.g. Compiled for Maruti Suzuki tier-1 compliance folders."
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite"
-                  value={summary}
-                  onChange={(e) => setSummary(e.target.value)}
+                  value={reportSummary}
+                  onChange={(e) => setReportSummary(e.target.value)}
                 />
               </div>
 
