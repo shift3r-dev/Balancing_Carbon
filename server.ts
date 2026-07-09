@@ -69,6 +69,43 @@ const num = (a: unknown, b?: unknown) => {
   const raw = a ?? b ?? 0; const n = Number(raw); return Number.isFinite(n) ? n : 0;
 };
 
+const FUEL_EMISSION_FACTORS: Record<string, number> = {
+  Diesel: 2.68,
+  Petrol: 2.31,
+  LPG: 1.51,
+  'Natural Gas': 2.02,
+  'Furnace Oil': 3.15,
+  Biomass: 0,
+};
+
+const GRID_ELECTRICITY_FACTOR = 0.716;
+
+function calculateFacilityEmissions(input: {
+  productionOutput: number;
+  electricityConsumption: number;
+  fuelConsumption: number;
+  fuelType: string;
+  renewableEnergyUsage: number;
+}) {
+  const renewablePercentage = Math.min(100, Math.max(0, input.renewableEnergyUsage));
+  const gridElectricity = input.electricityConsumption * (1 - renewablePercentage / 100);
+  const fuelFactor = FUEL_EMISSION_FACTORS[input.fuelType] ?? 0;
+
+  const emissionsScope1 = (input.fuelConsumption * fuelFactor) / 1000;
+  const emissionsScope2 = (gridElectricity * GRID_ELECTRICITY_FACTOR) / 1000;
+  const totalFootprint = emissionsScope1 + emissionsScope2;
+  const carbonIntensity = input.productionOutput > 0
+    ? (totalFootprint * 1000) / input.productionOutput
+    : 0;
+
+  return {
+    emissionsScope1: Number(emissionsScope1.toFixed(4)),
+    emissionsScope2: Number(emissionsScope2.toFixed(4)),
+    totalFootprint: Number(totalFootprint.toFixed(4)),
+    carbonIntensity: Number(carbonIntensity.toFixed(4)),
+  };
+}
+
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Balancing Carbon API' }));
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -178,16 +215,24 @@ app.post('/api/facilities', requireAuth, async (req: AuthenticatedRequest, res) 
     const electricity = num(b.electricityConsumption, b.electricity_consumption);
     const fuel = num(b.fuelConsumption, b.fuel_consumption);
     const renewable = num(b.renewableEnergyUsage, b.renewable_energy_usage);
-    const scope1 = num(b.emissionsScope1, b.emissions_scope_1);
-    const scope2 = num(b.emissionsScope2, b.emissions_scope_2);
-    const intensity = num(b.carbonIntensity, b.carbon_intensity) || ((scope1 + scope2) / (productionOutput || 1));
+    const fuelType = str(b.fuelType, b.fuel_type) || 'Diesel';
+    const calculations = calculateFacilityEmissions({
+      productionOutput,
+      electricityConsumption: electricity,
+      fuelConsumption: fuel,
+      fuelType,
+      renewableEnergyUsage: renewable,
+    });
+    const scope1 = calculations.emissionsScope1;
+    const scope2 = calculations.emissionsScope2;
+    const intensity = calculations.carbonIntensity;
 
     const row = {
       id: `fac-${randomUUID()}`, organisation_id: p.organisation_id, name, location,
       industry_type: industryType, production_output: productionOutput,
       production_unit: str(b.productionUnit, b.production_unit) || 'Tonnes',
       reporting_period: reportingPeriod, electricity_consumption: electricity,
-      fuel_consumption: fuel, fuel_type: str(b.fuelType, b.fuel_type) || 'Diesel',
+      fuel_consumption: fuel, fuel_type: fuelType,
       renewable_energy_usage: renewable, emissions_scope_1: scope1, emissions_scope_2: scope2,
       carbon_intensity: intensity, esg_readiness_status: str(b.esgReadinessStatus, b.esg_readiness_status) || 'Needs Improvement',
     };
@@ -199,22 +244,69 @@ app.post('/api/facilities', requireAuth, async (req: AuthenticatedRequest, res) 
 
 app.patch('/api/facilities/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
-    const p = await getProfile(req.authUser!.id), b = req.body ?? {}, u: any = {};
-    const mappings: [string, string, 's'|'n'][] = [
+    const p = await getProfile(req.authUser!.id);
+    const b = req.body ?? {};
+
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('facilities').select('*').eq('id', req.params.id)
+      .eq('organisation_id', p.organisation_id).single();
+
+    if (fetchError || !existing) return res.status(404).json({ error: 'Facility not found.' });
+
+    const u: any = {};
+    const mappings: [string, string, 's' | 'n'][] = [
       ['name','name','s'], ['location','location','s'], ['industryType','industry_type','s'],
       ['productionOutput','production_output','n'], ['productionUnit','production_unit','s'],
       ['reportingPeriod','reporting_period','s'], ['electricityConsumption','electricity_consumption','n'],
       ['fuelConsumption','fuel_consumption','n'], ['fuelType','fuel_type','s'],
-      ['renewableEnergyUsage','renewable_energy_usage','n'], ['emissionsScope1','emissions_scope_1','n'],
-      ['emissionsScope2','emissions_scope_2','n'], ['carbonIntensity','carbon_intensity','n'],
+      ['renewableEnergyUsage','renewable_energy_usage','n'],
       ['esgReadinessStatus','esg_readiness_status','s'],
     ];
-    for (const [front, db, kind] of mappings) if (b[front] !== undefined) u[db] = kind === 'n' ? num(b[front]) : str(b[front]);
-    if (!Object.keys(u).length) return res.status(400).json({ error: 'No valid facility fields provided.' });
-    const { data, error } = await supabaseAdmin.from('facilities').update(u).eq('id', req.params.id).eq('organisation_id', p.organisation_id).select('*').single();
+
+    for (const [front, db, kind] of mappings) {
+      if (b[front] !== undefined) u[db] = kind === 'n' ? num(b[front]) : str(b[front]);
+    }
+
+    const productionOutput = u.production_output ?? Number(existing.production_output ?? 0);
+    const electricityConsumption = u.electricity_consumption ?? Number(existing.electricity_consumption ?? 0);
+    const fuelConsumption = u.fuel_consumption ?? Number(existing.fuel_consumption ?? 0);
+    const fuelType = u.fuel_type ?? existing.fuel_type ?? 'Diesel';
+    const renewableEnergyUsage = u.renewable_energy_usage ?? Number(existing.renewable_energy_usage ?? 0);
+
+    const calculations = calculateFacilityEmissions({
+      productionOutput,
+      electricityConsumption,
+      fuelConsumption,
+      fuelType,
+      renewableEnergyUsage,
+    });
+
+    u.emissions_scope_1 = calculations.emissionsScope1;
+    u.emissions_scope_2 = calculations.emissionsScope2;
+    u.carbon_intensity = calculations.carbonIntensity;
+
+    const { data, error } = await supabaseAdmin.from('facilities').update(u)
+      .eq('id', req.params.id).eq('organisation_id', p.organisation_id)
+      .select('*').single();
+
     if (error || !data) return res.status(500).json({ error: error?.message ?? 'Update failed.' });
-    res.json({ success: true, facility: mapFacility(data) });
-  } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Update failed.' }); }
+
+    res.json({
+      success: true,
+      facility: mapFacility(data),
+      calculation: {
+        totalFootprint: calculations.totalFootprint,
+        scope1: calculations.emissionsScope1,
+        scope2: calculations.emissionsScope2,
+        carbonIntensity: calculations.carbonIntensity,
+        methodology: 'Activity data × emission factor',
+        gridEmissionFactor: GRID_ELECTRICITY_FACTOR,
+        fuelEmissionFactor: FUEL_EMISSION_FACTORS[fuelType] ?? 0,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Update failed.' });
+  }
 });
 
 app.delete('/api/facilities/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
