@@ -114,6 +114,7 @@ The ledger provides a foundation for:
 
 ---
 
+
 ## ESG Readiness Assessment
 
 The ESG assessment module helps organizations evaluate their environmental, social, and governance readiness.
