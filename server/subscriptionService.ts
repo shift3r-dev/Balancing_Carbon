@@ -1,0 +1,42 @@
+import { randomUUID } from 'node:crypto';
+import { supabaseAdmin } from './supabaseClients.js';
+
+const mapPlan = (row: any) => ({ id: row.id, name: row.name, slug: row.slug, description: row.description, monthlyPrice: Number(row.monthly_price ?? 0), yearlyPrice: Number(row.yearly_price ?? 0), currency: row.currency, trialDays: Number(row.trial_days ?? 0), recommended: Boolean(row.recommended), badge: row.badge ?? '', active: Boolean(row.active), sortOrder: Number(row.sort_order ?? 0), features: (row.plan_features ?? []).map((feature: any) => ({ key: feature.feature_key, label: feature.label, category: feature.category, availability: feature.availability })), limits: (row.plan_limits ?? []).map((limit: any) => ({ key: limit.limit_key, type: limit.value_type, value: limit.numeric_value === null ? null : Number(limit.numeric_value), displayValue: limit.display_value, unit: limit.unit })) });
+
+export async function getPlans() {
+  const { data, error } = await supabaseAdmin.from('plans').select('*, plan_features(*), plan_limits(*)').eq('active', true).is('deleted_at', null).order('sort_order');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapPlan);
+}
+
+export async function getSubscription(organisationId: string) {
+  const { data, error } = await supabaseAdmin.from('subscriptions').select('*, plans(*, plan_features(*), plan_limits(*))').eq('organisation_id', organisationId).is('deleted_at', null).in('status', ['trial', 'active', 'paused', 'pending', 'suspended', 'cancelled', 'expired']).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return { id: data.id, status: data.status, billingInterval: data.billing_interval, startedAt: data.started_at, trialEndsAt: data.trial_ends_at, renewalAt: data.renewal_at, expiresAt: data.expires_at, cancelledAt: data.cancelled_at, cancellationReason: data.cancellation_reason, plan: data.plans ? mapPlan(data.plans) : null };
+}
+
+export async function subscriptionUsage(organisationId: string) {
+  const [{ count: facilities }, { count: users }, { count: reports }] = await Promise.all([
+    supabaseAdmin.from('facilities').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId),
+    supabaseAdmin.from('organization_members').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId).is('deleted_at', null),
+    supabaseAdmin.from('reports').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId),
+  ]);
+  return { facilities: facilities ?? 0, users: users ?? 0, reportsGenerated: reports ?? 0, storageGb: 0, aiRequests: 0, limitsEnforced: false };
+}
+
+export async function changeSubscription(input: { organisationId: string; userId: string; planId?: string; action: 'upgrade' | 'cancel' | 'renew' }) {
+  const current = await getSubscription(input.organisationId);
+  if (!current) throw new Error('Subscription not found.');
+  let updates: any = {};
+  if (input.action === 'upgrade') {
+    if (!input.planId) throw new Error('Plan id is required.');
+    updates = { plan_id: input.planId, status: 'active', cancelled_at: null, cancellation_reason: null };
+  } else if (input.action === 'cancel') updates = { status: 'cancelled', cancelled_at: new Date().toISOString() };
+  else updates = { status: 'active', cancelled_at: null, cancellation_reason: null, renewal_at: new Date(Date.now() + 30 * 86400000).toISOString() };
+  const { data, error } = await supabaseAdmin.from('subscriptions').update(updates).eq('id', current.id).select('*').single();
+  if (error || !data) throw new Error(error?.message ?? 'Subscription update failed.');
+  await supabaseAdmin.from('subscription_history').insert({ id: `sub-history-${randomUUID()}`, subscription_id: current.id, previous_plan_id: current.plan?.id ?? null, next_plan_id: updates.plan_id ?? current.plan?.id ?? null, previous_status: current.status, next_status: updates.status, change_type: input.action, changed_by: input.userId });
+  await supabaseAdmin.from('subscription_events').insert({ id: `sub-event-${randomUUID()}`, subscription_id: current.id, organisation_id: input.organisationId, event_type: input.action, metadata: { planId: updates.plan_id ?? current.plan?.id ?? null } });
+  return getSubscription(input.organisationId);
+}

@@ -11,6 +11,7 @@ import { createIntelligenceRouter } from './server/routes/intelligenceRoutes.js'
 import { createOrganisationRouter } from './server/routes/organisationRoutes.js';
 import { createProductionRouter } from './server/routes/productionRoutes.js';
 import { createReportingRouter } from './server/routes/reportingRoutes.js';
+import { createSubscriptionRouter } from './server/routes/subscriptionRoutes.js';
 import { runtimeConfig } from './server/config/runtime.js';
 import { errorHandler } from './server/middleware/errorHandler.js';
 import { requestLogger } from './server/middleware/requestLogger.js';
@@ -33,6 +34,7 @@ app.use('/api/production', createProductionRouter());
 app.use('/api', createComplianceRouter());
 app.use('/api', createReportingRouter());
 app.use('/api', createIntelligenceRouter());
+app.use('/api', createSubscriptionRouter());
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
 

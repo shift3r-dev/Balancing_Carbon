@@ -40,12 +40,14 @@ import ESGAssessmentModule from "./components/ESGAssessmentModule.tsx";
 import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
 import DocumentCentre from "./components/DocumentCentre.tsx";
 import AIAssistantModule from "./components/AIAssistantModule.tsx";
+import SubscriptionSettings from "./components/SubscriptionSettings.tsx";
 import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
 const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
 const ServiceFirstFlow = lazy(() => import("./components/ServiceFirstFlow.tsx"));
 const SectorServicesFlow = lazy(() => import("./components/SectorServicesFlow.tsx"));
 const CarbonIntelligenceHub = lazy(() => import("./components/CarbonIntelligenceHub.tsx"));
+const PricingPage = lazy(() => import("./components/PricingPage.tsx"));
 
 // Shared interfaces
 import {
@@ -1202,7 +1204,7 @@ export default function App() {
 
                 {/* Company profile entity updates */}
                 {currentView === "dashboard-company" && renderCompanyProfile()}
-                {currentView === "dashboard-settings" && renderCompanyProfile()}
+                {currentView === "dashboard-settings" && <SubscriptionSettings />}
 
                 {/* Smart Chatbot */}
                 {currentView === "dashboard-ai-assistant" && (
@@ -1263,6 +1265,7 @@ export default function App() {
             >
               <Info className="w-3.5 h-3.5" /> About Us
             </button>
+            <button onClick={() => setCurrentView("pricing")} className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "pricing" ? "text-brand-forest" : "text-gray-500"}`}>Pricing</button>
           </nav>
 
           {/* Action Login triggers */}
@@ -1750,6 +1753,12 @@ export default function App() {
                 setCurrentView("login");
               }}
             />
+          </Suspense>
+        )}
+
+        {currentView === "pricing" && (
+          <Suspense fallback={<DashboardModuleLoader label="Loading pricing..." />}>
+            <PricingPage onStart={() => { setIsSignUpMode(true); setCurrentView("login"); }} />
           </Suspense>
         )}
 

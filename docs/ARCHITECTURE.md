@@ -62,6 +62,7 @@ Apply migrations to a fresh Supabase project in this order:
 5. `server/migrations/004_enterprise_saas_foundation.sql`
 6. `server/migrations/005_authentication_authorization.sql`
 7. `server/migrations/006_legacy_timestamp_repair.sql` only for databases created before the base schema migration
+8. `server/migrations/007_subscription_pricing.sql`
 
 Core ownership is `organisation -> facilities -> operational records`. Cross-cutting tenant-owned entities include ESG questions, OEM surveys, documents, reports, audit logs, diagnostics, opportunities, scenarios, and projects. The base schema includes foreign keys, check constraints, tenant indexes, timestamps, update triggers, and foundational RLS policies.
 
