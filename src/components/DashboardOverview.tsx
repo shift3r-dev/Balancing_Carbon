@@ -15,9 +15,10 @@ import {
   Zap,
 } from 'lucide-react';
 import {
-  Area,
-  AreaChart,
+  Bar,
   CartesianGrid,
+  ComposedChart,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -324,7 +325,7 @@ export default function DashboardOverview({
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 bg-white border border-brand-border rounded-xl p-5 shadow-sm h-96">
+        <div className="xl:col-span-2 bg-white border border-brand-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold font-mono uppercase text-brand-charcoal">Monthly Emissions Trend</h3>
@@ -332,25 +333,63 @@ export default function DashboardOverview({
             </div>
             <span className="text-[10px] font-mono text-gray-400">tCO2e</span>
           </div>
-          <ResponsiveContainer width="100%" height="82%">
-            <AreaChart data={model.chartData} margin={{ top: 10, right: 16, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="actualCarbon" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1F5A3D" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#1F5A3D" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#EDF1EC" />
-              <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="#94A3B8" />
-              <YAxis tick={{ fontSize: 10 }} stroke="#94A3B8" />
-              <Tooltip contentStyle={{ fontSize: 11, fontFamily: 'monospace' }} />
-              <Area type="monotone" dataKey="actual" name="Actual emissions" stroke="#1F5A3D" fill="url(#actualCarbon)" strokeWidth={2} />
-              {Number(organisation?.targetReductionPercent ?? 0) > 0 && (
-                <Area type="monotone" dataKey="target" name="Target emissions" stroke="#C88A32" fill="transparent" strokeDasharray="5 5" strokeWidth={2} />
-              )}
-              <Area type="monotone" dataKey="projected" name="Projected emissions" stroke="#64748B" fill="transparent" strokeDasharray="2 5" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="h-[300px] w-full">
+            {model.chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={model.chartData} margin={{ top: 12, right: 18, left: -8, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E6ECE5" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 10, fill: '#64748B', fontFamily: 'monospace' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#64748B', fontFamily: 'monospace' }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={56}
+                    tickFormatter={(value) => Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(31,90,61,0.08)' }}
+                    contentStyle={{ fontSize: 11, fontFamily: 'monospace', borderRadius: 8, borderColor: '#DDE8DF' }}
+                    formatter={(value: number | string, name) => [
+                      `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })} tCO2e`,
+                      name,
+                    ]}
+                  />
+                  <Bar dataKey="actual" name="Actual emissions" fill="#1F5A3D" radius={[6, 6, 0, 0]} barSize={34} />
+                  {Number(organisation?.targetReductionPercent ?? 0) > 0 && (
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      name="Target emissions"
+                      stroke="#C88A32"
+                      strokeDasharray="5 5"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: '#C88A32', strokeWidth: 0 }}
+                      connectNulls
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="projected"
+                    name="Projected emissions"
+                    stroke="#64748B"
+                    strokeDasharray="2 5"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#64748B', strokeWidth: 0 }}
+                    connectNulls
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full rounded-lg bg-brand-offwhite border border-dashed border-brand-border flex items-center justify-center text-xs font-mono text-gray-400">
+                Add activity records to build the monthly trend.
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-white border border-brand-border rounded-xl p-5 shadow-sm">
