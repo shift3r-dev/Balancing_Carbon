@@ -93,6 +93,40 @@ export default function DashboardOverview({
         </div>
       </div>
 
+      <div className="bg-brand-charcoal text-white rounded-2xl border border-white/10 p-5 md:p-6 overflow-hidden relative">
+        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{
+          backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,.14) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,.1) 1px, transparent 1px)',
+          backgroundSize: '54px 54px'
+        }} />
+        <div className="relative grid grid-cols-1 lg:grid-cols-4 gap-5 items-center">
+          <div className="lg:col-span-2 space-y-2">
+            <span className="text-[10px] uppercase tracking-widest font-mono text-brand-sage font-bold">Live Industrial Carbon Command View</span>
+            <h2 className="text-2xl md:text-3xl font-black tracking-tight">
+              {totalEmissions.toLocaleString('en-US', { maximumFractionDigits: 1 })} tCO2e under active audit control
+            </h2>
+            <p className="text-xs text-gray-300 leading-relaxed max-w-2xl">
+              Facility ledgers, evidence folders, OEM response status, and ESG maturity scores are grouped into one operating picture for compliance teams.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 lg:col-span-2 gap-3 text-xs">
+            <div className="bg-white/8 border border-white/10 rounded-xl p-4">
+              <span className="text-[9px] font-mono uppercase text-gray-400 block">Renewable Mix</span>
+              <strong className="text-xl font-mono text-brand-sage">{renewableRatio.toFixed(1)}%</strong>
+            </div>
+            <div className="bg-white/8 border border-white/10 rounded-xl p-4">
+              <span className="text-[9px] font-mono uppercase text-gray-400 block">Carbon Intensity</span>
+              <strong className="text-xl font-mono text-brand-sage">{(averageIntensity * 1000).toFixed(1)}</strong>
+              <span className="block text-[9px] text-gray-400">kg/t output</span>
+            </div>
+            <div className="bg-white/8 border border-white/10 rounded-xl p-4">
+              <span className="text-[9px] font-mono uppercase text-gray-400 block">Evidence Files</span>
+              <strong className="text-xl font-mono text-brand-sage">{documents.length}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Primary KPI Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         

@@ -16,12 +16,42 @@
   --color-brand-red: #B84A4A;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 /* Custom global utilities and clean scrollbars */
 html {
   background-color: var(--color-brand-offwhite);
   color: var(--color-brand-charcoal);
   font-family: var(--font-sans);
   scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background:
+    linear-gradient(180deg, rgba(247, 248, 244, 0.98), rgba(247, 248, 244, 1)),
+    radial-gradient(circle at 15% 0%, rgba(31, 90, 61, 0.09), transparent 28%),
+    radial-gradient(circle at 85% 8%, rgba(200, 138, 50, 0.1), transparent 24%);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+img,
+svg {
+  max-width: 100%;
 }
 
 /* Custom input and component focus states */
@@ -44,4 +74,443 @@ input:focus, select:focus, textarea:focus {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-brand-green-sec);
+}
+
+/* Premium public website treatment inspired by industrial CCUS storytelling */
+#public-website {
+  background:
+    linear-gradient(180deg, rgba(247, 248, 244, 0.94), rgba(247, 248, 244, 1) 42%),
+    repeating-linear-gradient(90deg, rgba(37, 42, 39, 0.025) 0 1px, transparent 1px 96px);
+}
+
+#public-website header {
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 40px rgba(37, 42, 39, 0.06);
+}
+
+#public-website header nav button,
+#public-website header .hidden button {
+  white-space: nowrap;
+}
+
+#public-website main > div {
+  animation: pageIn 420ms ease-out both;
+}
+
+#public-website main > div > section {
+  position: relative;
+}
+
+#public-website main > div.space-y-24 > section:first-child {
+  min-height: calc(100svh - 80px);
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  color: white;
+  background:
+    linear-gradient(115deg, rgba(15, 24, 20, 0.92), rgba(25, 62, 47, 0.84) 52%, rgba(37, 42, 39, 0.78)),
+    linear-gradient(180deg, rgba(31, 90, 61, 0.15), rgba(200, 138, 50, 0.08));
+}
+
+#public-website main > div.space-y-24 > section:first-child::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(180deg, black, transparent 86%);
+  pointer-events: none;
+}
+
+#public-website main > div.space-y-24 > section:first-child::after {
+  content: "";
+  position: absolute;
+  right: max(2rem, 8vw);
+  bottom: -2rem;
+  width: min(44vw, 520px);
+  aspect-ratio: 1.3;
+  border: 1px solid rgba(221, 232, 223, 0.22);
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(0deg, rgba(221, 232, 223, 0.2), transparent 52%),
+    linear-gradient(90deg, transparent 0 12%, rgba(221, 232, 223, 0.18) 12% 15%, transparent 15% 30%, rgba(221, 232, 223, 0.12) 30% 34%, transparent 34% 54%, rgba(221, 232, 223, 0.16) 54% 59%, transparent 59%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.28);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+#public-website main > div.space-y-24 > section:first-child h1,
+#public-website main > div.space-y-24 > section:first-child p,
+#public-website main > div.space-y-24 > section:first-child div {
+  position: relative;
+  z-index: 1;
+}
+
+#public-website main > div.space-y-24 > section:first-child h1 {
+  color: white;
+  font-size: clamp(2.7rem, 6vw, 5.8rem);
+  max-width: 1060px;
+  letter-spacing: 0;
+}
+
+#public-website main > div.space-y-24 > section:first-child h1 span {
+  color: #b8d6be;
+}
+
+#public-website main > div.space-y-24 > section:first-child p {
+  color: rgba(247, 248, 244, 0.82);
+  font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+}
+
+#public-website main > div.space-y-24 > section:first-child .inline-flex {
+  background: rgba(221, 232, 223, 0.12);
+  color: #dcecdf;
+  border-color: rgba(221, 232, 223, 0.28);
+}
+
+#public-website main > div.space-y-24 > section:first-child button {
+  border-radius: 999px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
+}
+
+#public-website main > div.space-y-24 > section:first-child button:first-child {
+  background: #dcecdf;
+  color: var(--color-brand-charcoal);
+}
+
+#public-website main > div.space-y-24 > section:first-child button:nth-child(2) {
+  background: var(--color-brand-amber);
+  color: white;
+}
+
+#public-website main > div.space-y-24 > section:first-child button:nth-child(3) {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+#public-website section.bg-white,
+#public-website main > div:not(.space-y-24),
+#public-website .bg-white.border {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+#public-website section .rounded-xl,
+#public-website section .rounded-2xl,
+#public-website main > div > .rounded-2xl,
+#public-website main > div > .bg-white {
+  box-shadow: 0 24px 70px rgba(37, 42, 39, 0.08);
+}
+
+#public-website main > div.space-y-24 > section:nth-child(2) .bg-white,
+#public-website main > div.space-y-24 > section:nth-child(4) .bg-brand-charcoal {
+  border-radius: 10px;
+}
+
+#public-website h1,
+#public-website h2,
+#public-website h3 {
+  letter-spacing: 0;
+}
+
+/* Dashboard polish */
+#client-dashboard-app {
+  background:
+    radial-gradient(circle at 18% -8%, rgba(31, 90, 61, 0.13), transparent 28%),
+    radial-gradient(circle at 90% 4%, rgba(200, 138, 50, 0.11), transparent 24%),
+    var(--color-brand-offwhite);
+}
+
+#client-dashboard-app > div:first-child {
+  box-shadow: 18px 0 60px rgba(37, 42, 39, 0.08);
+  z-index: 30;
+}
+
+#client-dashboard-app header {
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+#client-dashboard-app main {
+  padding: clamp(1rem, 2vw, 1.75rem);
+}
+
+#client-dashboard-app main > div,
+#client-dashboard-app main > section {
+  max-width: 1600px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+#client-dashboard-app .bg-white {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+#client-dashboard-app .rounded-xl,
+#client-dashboard-app .rounded-2xl {
+  border-radius: 10px;
+}
+
+#client-dashboard-app main .bg-white.border,
+#client-dashboard-app main .bg-brand-charcoal,
+#client-dashboard-app main .bg-brand-forest {
+  box-shadow: 0 18px 50px rgba(37, 42, 39, 0.07);
+}
+
+#client-dashboard-app table {
+  min-width: 780px;
+}
+
+#client-dashboard-app th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+#client-dashboard-app input,
+#client-dashboard-app select,
+#client-dashboard-app textarea,
+#public-website input,
+#public-website select,
+#public-website textarea {
+  border-radius: 8px;
+}
+
+#client-dashboard-app button,
+#public-website button {
+  transition-property: transform, box-shadow, background-color, color, border-color, opacity;
+  transition-duration: 180ms;
+}
+
+#client-dashboard-app button:hover,
+#public-website button:hover {
+  transform: translateY(-1px);
+}
+
+.recharts-wrapper {
+  max-width: 100%;
+}
+
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 1280px) {
+  #public-website .max-w-5xl {
+    max-width: 1180px;
+  }
+
+  #public-website .max-w-7xl {
+    max-width: 1480px;
+  }
+}
+
+@media (max-width: 1100px) {
+  #public-website header nav {
+    gap: 1rem;
+  }
+
+  #public-website header nav button {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 900px) {
+  #client-dashboard-app {
+    display: block;
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+    padding-bottom: 80px;
+  }
+
+  #client-dashboard-app > div:first-child {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100% !important;
+    height: 76px;
+    display: flex;
+    flex-direction: row;
+    border-right: 0;
+    border-top: 1px solid var(--color-brand-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  #client-dashboard-app > div:first-child > button,
+  #client-dashboard-app > div:first-child > div:first-of-type,
+  #client-dashboard-app > div:first-child > div:nth-of-type(2),
+  #client-dashboard-app > div:first-child > div:last-child {
+    display: none;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) {
+    flex: 1;
+    display: flex;
+    gap: 0.35rem;
+    overflow-x: auto;
+    padding: 0.55rem;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) > div {
+    display: flex;
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) span:first-child {
+    display: none;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) button {
+    min-width: 64px;
+    height: 58px;
+    justify-content: center;
+    padding: 0.5rem;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 9px;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) button span {
+    display: block !important;
+    max-width: 58px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.05;
+  }
+
+  #client-dashboard-app > div:nth-child(2) {
+    min-height: 100svh;
+  }
+
+  #client-dashboard-app header {
+    height: auto;
+    min-height: 64px;
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #client-dashboard-app header > div {
+    flex-wrap: wrap;
+  }
+
+  #client-dashboard-app main {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 760px) {
+  #public-website header {
+    height: 68px;
+    padding-inline: 1rem;
+  }
+
+  #public-website main > div.space-y-24 {
+    padding-bottom: 4rem;
+  }
+
+  #public-website main > div.space-y-24 > section:first-child {
+    min-height: calc(100svh - 68px);
+    padding-block: 4rem;
+  }
+
+  #public-website main > div.space-y-24 > section:first-child::after {
+    width: 85vw;
+    right: -18vw;
+    opacity: 0.24;
+  }
+
+  #public-website main > div.space-y-24 > section:first-child h1 {
+    font-size: clamp(2.25rem, 12vw, 3.5rem);
+  }
+
+  #public-website main > div.space-y-24 > section:first-child .pt-4 {
+    width: 100%;
+  }
+
+  #public-website main > div.space-y-24 > section:first-child button,
+  #public-website .flex.justify-center.gap-3 button {
+    width: 100%;
+  }
+
+  #public-website .grid {
+    gap: 1rem;
+  }
+
+  #public-website section,
+  #public-website main > div:not(.space-y-24) {
+    padding-inline: 1rem;
+  }
+
+  #client-dashboard-app .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #client-dashboard-app .h-96,
+  #client-dashboard-app .h-80,
+  #client-dashboard-app .h-\[440px\],
+  #client-dashboard-app .h-\[520px\] {
+    height: auto;
+    min-height: 320px;
+  }
+
+  #client-dashboard-app .flex.justify-between,
+  #public-website .flex.justify-between {
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  #client-dashboard-app main .bg-white.p-5,
+  #client-dashboard-app main .bg-white.p-6,
+  #public-website .bg-white.p-6,
+  #public-website .p-8,
+  #public-website .p-10 {
+    padding: 1rem;
+  }
+
+  table {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 520px) {
+  #public-website .text-3xl,
+  #client-dashboard-app .text-3xl {
+    font-size: 1.65rem;
+  }
+
+  #public-website .text-2xl,
+  #client-dashboard-app .text-2xl {
+    font-size: 1.35rem;
+  }
+
+  #public-website .rounded-2xl,
+  #client-dashboard-app .rounded-2xl {
+    border-radius: 12px;
+  }
+
+  #client-dashboard-app main {
+    padding-inline: 0.75rem;
+  }
+
+  #client-dashboard-app > div:first-child > div:nth-of-type(3) button {
+    min-width: 58px;
+  }
 }

@@ -1232,6 +1232,33 @@ export default function App() {
                     Secure Client Portal
                   </button>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto pt-8 text-left">
+                  <div className="bg-white/8 border border-white/15 rounded-xl p-4 backdrop-blur-sm">
+                    <span className="text-[9px] font-mono uppercase text-white/55 tracking-widest block">
+                      Calculation Method
+                    </span>
+                    <strong className="text-lg font-mono text-brand-sage block mt-1">
+                      CEA + IPCC
+                    </strong>
+                  </div>
+                  <div className="bg-white/8 border border-white/15 rounded-xl p-4 backdrop-blur-sm">
+                    <span className="text-[9px] font-mono uppercase text-white/55 tracking-widest block">
+                      Built For
+                    </span>
+                    <strong className="text-lg font-mono text-brand-sage block mt-1">
+                      OEM Audits
+                    </strong>
+                  </div>
+                  <div className="bg-white/8 border border-white/15 rounded-xl p-4 backdrop-blur-sm">
+                    <span className="text-[9px] font-mono uppercase text-white/55 tracking-widest block">
+                      Data Model
+                    </span>
+                    <strong className="text-lg font-mono text-brand-sage block mt-1">
+                      Multi-Tenant
+                    </strong>
+                  </div>
+                </div>
               </div>
             </section>
 
