@@ -18,6 +18,21 @@ interface OverviewProps {
   onNavigate: (view: ViewState) => void;
 }
 
+const calculateAverageScore = (questions: ESGQuestion[]): number => {
+  const validScores = questions
+    .map((question) => Number(question.score))
+    .filter((score) => Number.isFinite(score));
+
+  if (validScores.length === 0) return 0;
+
+  return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+};
+
+const clampPercentage = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+};
+
 export default function DashboardOverview({ 
   facilities, 
   records, 
@@ -40,7 +55,7 @@ export default function DashboardOverview({
   const averageIntensity = totalProduction > 0 ? (totalEmissions / totalProduction) : 0;
 
   // ESG score calculate
-  const esgScoreAverage = Math.round(esgQuestions.reduce((sum, q) => sum + q.score, 0) / (esgQuestions.length || 1) * 10);
+  const esgScoreAverage = calculateAverageScore(esgQuestions);
 
   // Chart 1: Monthly emissions trend mock data (representing FY2025-26)
   const emissionsTrendData = [
@@ -161,9 +176,9 @@ export default function DashboardOverview({
         <div className="bg-white border border-brand-border p-4 rounded-xl flex flex-col justify-between">
           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold font-mono">ESG Readiness</p>
           <div className="flex items-center gap-2 text-brand-forest mt-2">
-            <span className="text-2xl font-bold font-mono">{esgScoreAverage}%</span>
+            <span className="text-2xl font-bold font-mono">{esgScoreAverage.toFixed(1)}%</span>
             <div className="h-2 flex-1 bg-brand-sage rounded-full overflow-hidden">
-              <div className="h-full bg-brand-forest transition-all duration-500" style={{ width: `${esgScoreAverage}%` }}></div>
+              <div className="h-full bg-brand-forest transition-all duration-500" style={{ width: `${clampPercentage(esgScoreAverage)}%` }}></div>
             </div>
           </div>
         </div>

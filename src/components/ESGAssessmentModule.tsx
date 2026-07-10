@@ -11,6 +11,21 @@ interface ESGProps {
   documents: { id: string, name: string }[];
 }
 
+const calculateAverageScore = (questions: ESGQuestion[]): number => {
+  const validScores = questions
+    .map((question) => Number(question.score))
+    .filter((score) => Number.isFinite(score));
+
+  if (validScores.length === 0) return 0;
+
+  return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+};
+
+const clampPercentage = (value: number): number => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(100, Math.max(0, value));
+};
+
 export default function ESGAssessmentModule({ questions, onUpdateQuestion, documents }: ESGProps) {
   const [activeCategory, setActiveCategory] = useState<'All' | 'Environmental' | 'Social' | 'Governance' | 'Compliance'>('All');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -24,14 +39,19 @@ export default function ESGAssessmentModule({ questions, onUpdateQuestion, docum
   const categories = ['All', 'Environmental', 'Social', 'Governance', 'Compliance'];
 
   // Calculations
-  const averageScore = Math.round(questions.reduce((sum, q) => sum + q.score, 0) / (questions.length || 1) * 10);
+  const averageScore = calculateAverageScore(questions);
   
   const categoryScores = {
-    Environmental: Math.round(questions.filter(q => q.category === 'Environmental' || q.category === 'Carbon' || q.category === 'Energy').reduce((sum, q) => sum + q.score, 0) / (questions.filter(q => q.category === 'Environmental' || q.category === 'Carbon' || q.category === 'Energy').length || 1) * 10),
-    Social: Math.round(questions.filter(q => q.category === 'Social').reduce((sum, q) => sum + q.score, 0) / (questions.filter(q => q.category === 'Social').length || 1) * 10),
-    Governance: Math.round(questions.filter(q => q.category === 'Governance').reduce((sum, q) => sum + q.score, 0) / (questions.filter(q => q.category === 'Governance').length || 1) * 10),
-    Compliance: Math.round(questions.filter(q => q.category === 'Compliance').reduce((sum, q) => sum + q.score, 0) / (questions.filter(q => q.category === 'Compliance').length || 1) * 10),
+    Environmental: calculateAverageScore(questions.filter(q => q.category === 'Environmental' || q.category === 'Carbon' || q.category === 'Energy')),
+    Social: calculateAverageScore(questions.filter(q => q.category === 'Social')),
+    Governance: calculateAverageScore(questions.filter(q => q.category === 'Governance')),
+    Compliance: calculateAverageScore(questions.filter(q => q.category === 'Compliance')),
   };
+
+  const outOfRangeScoreCount = questions
+    .map((question) => Number(question.score))
+    .filter((score) => Number.isFinite(score) && (score < 0 || score > 100))
+    .length;
 
   const filteredQuestions = questions.filter(q => {
     if (activeCategory === 'All') return true;
@@ -77,9 +97,15 @@ export default function ESGAssessmentModule({ questions, onUpdateQuestion, docum
         </div>
         <div className="flex items-center gap-2 font-mono text-xs bg-brand-charcoal text-white px-3 py-1.5 rounded-lg">
           <Sparkles className="w-4 h-4 text-brand-sage animate-pulse" />
-          <span>BRSR Readiness Score: <strong>{averageScore}%</strong></span>
+          <span>BRSR Readiness Score: <strong>{averageScore.toFixed(1)}%</strong></span>
         </div>
       </div>
+
+      {outOfRangeScoreCount > 0 && (
+        <div className="bg-amber-50 border border-brand-amber/30 text-brand-amber rounded-xl px-4 py-3 text-xs font-mono">
+          {outOfRangeScoreCount} ESG score value{outOfRangeScoreCount === 1 ? '' : 's'} fall outside the expected 0-100 range. Scores are shown as stored; progress bars are visually clamped.
+        </div>
+      )}
 
       {/* Category Breakdowns Dashboard Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -87,44 +113,44 @@ export default function ESGAssessmentModule({ questions, onUpdateQuestion, docum
         <div className="bg-white p-4 rounded-xl border border-brand-border flex flex-col justify-between">
           <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">Environmental Hub</span>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Environmental}%</span>
+            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Environmental.toFixed(1)}%</span>
             <span className="text-[9px] font-mono text-brand-forest">E-Indicator</span>
           </div>
           <div className="h-1 bg-brand-border rounded-full overflow-hidden mt-2">
-            <div className="h-full bg-brand-forest" style={{ width: `${categoryScores.Environmental}%` }} />
+            <div className="h-full bg-brand-forest" style={{ width: `${clampPercentage(categoryScores.Environmental)}%` }} />
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-brand-border flex flex-col justify-between">
           <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">Social Responsibility</span>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Social}%</span>
+            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Social.toFixed(1)}%</span>
             <span className="text-[9px] font-mono text-brand-green-sec">S-Indicator</span>
           </div>
           <div className="h-1 bg-brand-border rounded-full overflow-hidden mt-2">
-            <div className="h-full bg-brand-green-sec" style={{ width: `${categoryScores.Social}%` }} />
+            <div className="h-full bg-brand-green-sec" style={{ width: `${clampPercentage(categoryScores.Social)}%` }} />
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-brand-border flex flex-col justify-between">
           <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider font-semibold">Governance & Integrity</span>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Governance}%</span>
+            <span className="text-2xl font-black font-mono tracking-tight text-brand-charcoal">{categoryScores.Governance.toFixed(1)}%</span>
             <span className="text-[9px] font-mono text-brand-charcoal">G-Indicator</span>
           </div>
           <div className="h-1 bg-brand-border rounded-full overflow-hidden mt-2">
-            <div className="h-full bg-brand-charcoal" style={{ width: `${categoryScores.Governance}%` }} />
+            <div className="h-full bg-brand-charcoal" style={{ width: `${clampPercentage(categoryScores.Governance)}%` }} />
           </div>
         </div>
 
         <div className="bg-brand-charcoal text-white p-4 rounded-xl border border-white/5 flex flex-col justify-between">
           <span className="text-[10px] font-mono text-brand-sage uppercase tracking-wider font-semibold">Regulatory Compliance</span>
           <div className="flex items-baseline justify-between mt-2">
-            <span className="text-2xl font-black font-mono tracking-tight text-brand-sage">{categoryScores.Compliance}%</span>
+            <span className="text-2xl font-black font-mono tracking-tight text-brand-sage">{categoryScores.Compliance.toFixed(1)}%</span>
             <span className="text-[9px] font-mono text-brand-amber">CTO Permits</span>
           </div>
           <div className="h-1 bg-white/10 rounded-full overflow-hidden mt-2">
-            <div className="h-full bg-brand-amber" style={{ width: `${categoryScores.Compliance}%` }} />
+            <div className="h-full bg-brand-amber" style={{ width: `${clampPercentage(categoryScores.Compliance)}%` }} />
           </div>
         </div>
 
@@ -237,14 +263,14 @@ export default function ESGAssessmentModule({ questions, onUpdateQuestion, docum
                       </div>
                       <div className="space-y-2">
                         <div>
-                          <label className="block font-mono text-gray-400 mb-1">Maturity Score (0-10)</label>
+                          <label className="block font-mono text-gray-400 mb-1">Maturity Score (0-100)</label>
                           <input
                             type="number"
                             min="0"
-                            max="10"
+                            max="100"
                             className="w-full border border-brand-border p-2 rounded bg-white text-xs font-mono"
                             value={editScore}
-                            onChange={(e) => setEditScore(parseInt(e.target.value) || 0)}
+                            onChange={(e) => setEditScore(Number(e.target.value) || 0)}
                           />
                         </div>
                         <div>
