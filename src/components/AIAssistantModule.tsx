@@ -41,45 +41,17 @@ export default function AIAssistantModule() {
     setInput('');
     setLoading(true);
 
-    try {
-      const response = await fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: textToSend })
-      });
-      
-      let data: any = {};
-      if (response.ok) {
-        try {
-          const text = await response.text();
-          if (text && text.trim() !== '' && text.trim() !== 'undefined') {
-            data = JSON.parse(text);
-          }
-        } catch (parseErr) {
-          console.error("Error parsing AI assistant response:", parseErr);
-        }
-      }
-
+    window.setTimeout(() => {
       setMessages(prev => [
         ...prev, 
         { 
           id: 'ai-' + Date.now(), 
           sender: 'assistant', 
-          text: data.text || data.reply || "I encountered an issue processing your query in the secure context. Please check that GEMINI_API_KEY is configured in the AI Studio Secrets panel." 
+          text: "The Carbon AI Assistant is planned as a future feature. Once an AI API subscription is available, this workspace can be connected to the secure assistant backend. For now, the rest of the dashboard stores and retrieves operational data directly from Supabase." 
         }
       ]);
-    } catch (err) {
-      setMessages(prev => [
-        ...prev, 
-        { 
-          id: 'err-' + Date.now(), 
-          sender: 'assistant', 
-          text: "Communication error with secure tenant proxy. Ensure the Express server is online." 
-        }
-      ]);
-    } finally {
       setLoading(false);
-    }
+    }, 400);
   };
 
   return (

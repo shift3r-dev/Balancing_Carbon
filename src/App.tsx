@@ -591,16 +591,16 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-gray-400 font-mono mb-1">
-                  Registration Identifier (CIN)
+                  Employee Count
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.registrationNumber}
+                  value={organisation.employeeCount}
                   onChange={(e) =>
                     handleUpdateOrg({
                       ...organisation,
-                      registrationNumber: e.target.value,
+                      employeeCount: parseInt(e.target.value, 10) || 0,
                     })
                   }
                 />
@@ -615,11 +615,11 @@ export default function App() {
                 <input
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite text-brand-charcoal"
-                  value={organisation.hqAddress}
+                  value={organisation.location}
                   onChange={(e) =>
                     handleUpdateOrg({
                       ...organisation,
-                      hqAddress: e.target.value,
+                      location: e.target.value,
                     })
                   }
                 />
@@ -631,9 +631,12 @@ export default function App() {
                 <input
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite text-brand-charcoal"
-                  value={organisation.sector}
+                  value={organisation.industry}
                   onChange={(e) =>
-                    handleUpdateOrg({ ...organisation, sector: e.target.value })
+                    handleUpdateOrg({
+                      ...organisation,
+                      industry: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -645,29 +648,13 @@ export default function App() {
                   Net Carbon Target reduction
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.targetReduction}
+                  value={organisation.targetReductionPercent}
                   onChange={(e) =>
                     handleUpdateOrg({
                       ...organisation,
-                      targetReduction: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <label className="block text-gray-400 font-mono mb-1">
-                  Target Milestone Year
-                </label>
-                <input
-                  type="text"
-                  className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.targetYear}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      targetYear: e.target.value,
+                      targetReductionPercent: parseInt(e.target.value, 10) || 0,
                     })
                   }
                 />
@@ -679,13 +666,24 @@ export default function App() {
                 <input
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.reportingPeriod}
+                  value={organisation.reportingYear}
                   onChange={(e) =>
                     handleUpdateOrg({
                       ...organisation,
-                      reportingPeriod: e.target.value,
+                      reportingYear: e.target.value,
                     })
                   }
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 font-mono mb-1">
+                  Organisation ID
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
+                  value={organisation.id}
                 />
               </div>
             </div>
