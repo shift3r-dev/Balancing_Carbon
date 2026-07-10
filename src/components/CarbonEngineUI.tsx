@@ -23,10 +23,9 @@ export default function CarbonEngineUI({ scopeType, facilities, records = [] }: 
     'Furnace Oil': { factor: 3.15, unit: 'kgCO2e/litre', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Emissions from heavy industrial steam boilers.' },
     'Biomass': { factor: 0.05, unit: 'kgCO2e/kg', source: 'Prototype biogenic component - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Prototype biomass combustion component for direct plant fuel tracking.' },
     'Coal': { factor: 2.42, unit: 'kgCO2e/kg', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Direct emissions from coal combustion where still present in process heat operations.' },
-    'Other Fuel': { factor: 1.0, unit: 'kgCO2e/unit', source: 'Placeholder factor - replace before real reporting', scope: 'Scope 1', desc: 'Fallback architecture support for custom direct fuels until a verified factor is entered.' },
     'Grid Electricity': { factor: 0.716, unit: 'kgCO2e/kWh', source: 'Prototype grid factor - replace with authoritative source before audit use', scope: 'Scope 2', desc: 'Location-based Scope 2 emissions for grid electricity consumption.' },
-    'Solar Electricity': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for on-site solar generation; certificates and residual mix are not modeled.' },
-    'Wind Electricity': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for wind electricity; certificates and residual mix are not modeled.' },
+    'On-site Solar': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for on-site solar generation; certificates and residual mix are not modeled.' },
+    'On-site Wind': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for on-site wind generation; certificates and residual mix are not modeled.' },
     'Purchased Steam': { factor: 0.184, unit: 'kgCO2e/kg', source: 'Prototype supplier-energy factor - replace with supplier-specific source', scope: 'Scope 2', desc: 'Indirect emissions from purchased steam supplied by an external provider.' },
     'Purchased Heat': { factor: 0.184, unit: 'kgCO2e/kWh', source: 'Prototype supplier-energy factor - replace with supplier-specific source', scope: 'Scope 2', desc: 'Indirect emissions from purchased heat supplied by an external provider.' },
     'Steel Raw Ingestion': { factor: 1.85, unit: 'kgCO2e/kg', source: 'DEFRA v2025 Material Purchasing', scope: 'Scope 3', desc: 'Upstream embedded carbon of structural steel sheets purchased from primary furnaces.' },
@@ -55,7 +54,7 @@ export default function CarbonEngineUI({ scopeType, facilities, records = [] }: 
       kgCO2e: kgCO2e.toLocaleString(undefined, { maximumFractionDigits: 2 }),
       tCO2e: tCO2e.toFixed(4),
       formula: `${qty.toLocaleString()} [Activity Qty] × ${metadata.factor} [Factor] = ${kgCO2e.toLocaleString(undefined, { maximumFractionDigits: 1 })} kgCO₂e`,
-      audit: `Methodology: ${metadata.scope} Deterministic Ledger calculation. Verified using statutory ${metadata.source} coefficients.`
+      audit: `Methodology: ${metadata.scope} deterministic ledger calculation using the configured factor source: ${metadata.source}.`
     };
   };
 

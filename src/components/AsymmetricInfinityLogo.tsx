@@ -13,26 +13,26 @@ export default function AsymmetricInfinityLogo({
   hideText = false,
   variant = 'light'
 }: LogoProps) {
-  // Proportional height classes for the logo mark (matches original compact dimensions)
+  // Proportional height classes for the logo mark.
   const heightClasses = {
-    sm: 'h-6 sm:h-7',
-    md: 'h-9 sm:h-10',
-    lg: 'h-12 sm:h-14'
+    sm: 'h-8 sm:h-9',
+    md: 'h-11 sm:h-12',
+    lg: 'h-14 sm:h-16'
   };
 
   // Proportional text sizing mapped by logo size
   const textSizes = {
     sm: {
-      main: 'text-[13px] sm:text-[14px] font-bold tracking-wide',
-      sub: 'text-[8px] tracking-[0.2em] mt-0.5'
+      main: 'text-[15px] sm:text-[16px] font-bold tracking-wide',
+      sub: 'text-[9px] tracking-[0.22em] mt-0.5'
     },
     md: {
-      main: 'text-[18px] sm:text-[20px] font-extrabold tracking-wider',
-      sub: 'text-[10px] tracking-[0.25em] mt-0.5'
+      main: 'text-[21px] sm:text-[23px] font-extrabold tracking-wider',
+      sub: 'text-[11px] tracking-[0.27em] mt-0.5'
     },
     lg: {
-      main: 'text-[24px] sm:text-[26px] font-black tracking-widest',
-      sub: 'text-[13px] tracking-[0.3em] mt-1'
+      main: 'text-[28px] sm:text-[32px] font-black tracking-widest',
+      sub: 'text-[15px] tracking-[0.32em] mt-1'
     }
   };
 
@@ -61,8 +61,8 @@ export default function AsymmetricInfinityLogo({
         {/* Vector SVG Fallback (hidden unless Balancing.png fails to load) */}
         <div className="hidden">
           <svg
-            width={size === 'sm' ? 44 : size === 'md' ? 66 : 90}
-            height={size === 'sm' ? 24 : size === 'md' ? 36 : 50}
+            width={size === 'sm' ? 58 : size === 'md' ? 82 : 106}
+            height={size === 'sm' ? 32 : size === 'md' ? 46 : 58}
             viewBox="0 0 108 60"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -111,4 +111,3 @@ export default function AsymmetricInfinityLogo({
     </div>
   );
 }
-

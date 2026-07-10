@@ -111,8 +111,8 @@ export const prototypeEmissionFactors: EmissionFactor[] = [
     notes: 'Prototype grid factor retained for product testing; do not present as audit-grade.',
   },
   {
-    id: 'ef-solar-electricity-india-2025-prototype',
-    sourceType: 'Solar Electricity',
+    id: 'ef-onsite-solar-india-2025-prototype',
+    sourceType: 'On-site Solar',
     displayName: 'On-site solar electricity',
     scope: 'scope-2',
     factorValue: 0,
@@ -130,9 +130,9 @@ export const prototypeEmissionFactors: EmissionFactor[] = [
     notes: 'This is not market-based Scope 2 accounting and does not model certificates or residual mix.',
   },
   {
-    id: 'ef-wind-electricity-india-2025-prototype',
-    sourceType: 'Wind Electricity',
-    displayName: 'Wind electricity',
+    id: 'ef-onsite-wind-india-2025-prototype',
+    sourceType: 'On-site Wind',
+    displayName: 'On-site wind electricity',
     scope: 'scope-2',
     factorValue: 0,
     factorUnit: 'kgCO2e/kWh',
@@ -319,25 +319,6 @@ export const prototypeEmissionFactors: EmissionFactor[] = [
     isActive: true,
     notes: 'Prototype only; supplier-specific heat factors are required for real reporting.',
   },
-  {
-    id: 'ef-other-fuel-india-2025-prototype',
-    sourceType: 'Other Fuel',
-    displayName: 'Other direct fuel',
-    scope: 'scope-1',
-    factorValue: 1,
-    factorUnit: 'kgCO2e/unit',
-    activityUnit: 'unit',
-    compatibleUnits: ['unit'],
-    geography: 'India',
-    reportingYear: '2025',
-    methodology: 'Placeholder fuel factor',
-    sourceName: 'Prototype factor - replace before use',
-    sourceReference: 'Prototype registry seeded in application code',
-    version: '1.0',
-    validFrom: '2025-04-01',
-    isActive: true,
-    notes: 'Placeholder only. Do not use for audit reporting.',
-  },
 ];
 
 export function normalizeUnit(unit: string): string {
@@ -358,10 +339,11 @@ export function deriveActivityType(sourceType: string): ActivityType {
 export function resolveEmissionFactor(sourceType: string): EmissionFactor | null {
   const normalizedSource = sourceType.trim().toLowerCase();
   const aliases: Record<string, string> = {
-    'renewable electricity': 'solar electricity',
-    'on-site solar': 'solar electricity',
-    solar: 'solar electricity',
-    wind: 'wind electricity',
+    'renewable electricity': 'on-site solar',
+    'solar electricity': 'on-site solar',
+    solar: 'on-site solar',
+    'wind electricity': 'on-site wind',
+    wind: 'on-site wind',
     'grid power': 'grid electricity',
   };
   const lookup = aliases[normalizedSource] ?? normalizedSource;

@@ -10,10 +10,16 @@ import {
   FolderClosed,
   BarChart3,
   Bot,
+  Lightbulb,
   Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
+  Bell,
+  ClipboardList,
+  Database,
+  Gauge,
+  Target,
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
@@ -57,54 +63,77 @@ export default function DashboardSidebar({
 
   const menuItems = [
     {
-      label: "Main Dashboard",
+      label: "Command Center",
       items: [
         { id: "dashboard-overview", label: "Overview", icon: LayoutDashboard },
-        { id: "dashboard-company", label: "Company Profile", icon: Building2 },
+        { id: "dashboard-company", label: "Organisation", icon: Building2 },
         { id: "dashboard-facilities", label: "Facilities", icon: Factory },
       ],
     },
     {
-      label: "Metrics & Ledger",
+      label: "Carbon Inventory",
       items: [
-        { id: "dashboard-energy", label: "Energy & Fuel", icon: Zap },
+        { id: "dashboard-calculator", label: "Calculator", icon: BarChart3 },
+        { id: "dashboard-energy", label: "Energy Ledger", icon: Zap },
+        { id: "dashboard-energy", label: "Production", icon: Database },
         {
           id: "dashboard-emissions-scope1",
-          label: "Scope 1 Footprint",
+          label: "Scope 1",
           icon: Flame,
         },
         {
           id: "dashboard-emissions-scope2",
-          label: "Scope 2 Electricity",
+          label: "Scope 2",
           icon: BarChart3,
         },
         {
           id: "dashboard-emissions-scope3",
-          label: "Scope 3 Supply Chain",
+          label: "Scope 3",
           icon: BarChart3,
-          badge: "Future",
+          badge: "Soon",
         },
-      ],
-    },
-    {
-      label: "Compliance & Audit",
-      items: [
-        { id: "dashboard-esg", label: "ESG Readiness", icon: ShieldAlert },
-        {
-          id: "dashboard-questionnaires",
-          label: "OEM Questionnaires",
-          icon: FileCheck,
-        },
-        {
-          id: "dashboard-documents",
-          label: "Document Locker",
-          icon: FolderClosed,
-        },
-        { id: "dashboard-reports", label: "Reports Centre", icon: BarChart3 },
       ],
     },
     {
       label: "Intelligence",
+      items: [
+        {
+          id: "dashboard-intelligence",
+          label: "Diagnostics",
+          icon: Lightbulb,
+        },
+        {
+          id: "dashboard-intelligence",
+          label: "Hotspots",
+          icon: Gauge,
+        },
+        {
+          id: "dashboard-intelligence",
+          label: "Scenario Modeller",
+          icon: Target,
+        },
+        {
+          id: "dashboard-intelligence",
+          label: "Projects",
+          icon: ClipboardList,
+        },
+      ],
+    },
+    {
+      label: "Reporting & Evidence",
+      items: [
+        { id: "dashboard-reports", label: "Reports", icon: BarChart3 },
+        { id: "dashboard-documents", label: "Documents", icon: FolderClosed },
+        {
+          id: "dashboard-questionnaires",
+          label: "OEM",
+          icon: FileCheck,
+        },
+        { id: "dashboard-esg", label: "ESG Readiness", icon: ShieldAlert },
+      ],
+    },
+    {
+      label: "System",
       items: [
         {
           id: "dashboard-ai-assistant",
@@ -113,6 +142,8 @@ export default function DashboardSidebar({
           isHot: true,
         },
         { id: "dashboard-settings", label: "System Settings", icon: Settings },
+        { id: "dashboard-settings", label: "Audit Logs", icon: ClipboardList, badge: "Soon" },
+        { id: "dashboard-settings", label: "Notifications", icon: Bell, badge: "Soon" },
       ],
     },
   ];

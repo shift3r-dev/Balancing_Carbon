@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Upload, FileSpreadsheet, Calendar, Filter, Trash2, Factory } from 'lucide-react';
+import { Plus, Upload, FileSpreadsheet, Calendar, Filter, Trash2, Factory, Pencil } from 'lucide-react';
 import { EnergyRecord, Facility, ProductionRecord } from '../types.ts';
 
 interface EnergyProps {
@@ -7,14 +7,15 @@ interface EnergyProps {
   productionRecords?: ProductionRecord[];
   facilities: Facility[];
   onAddRecord: (record: any) => void;
+  onUpdateRecord?: (id: string, record: any) => void;
   onAddProduction?: (record: any) => void;
   onDeleteRecord?: (id: string) => void;
 }
 
 const SOURCE_OPTIONS = [
   { sourceType: 'Grid Electricity', activityType: 'electricity', unit: 'kWh', scope: 'scope-2', factor: 0.716, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'Solar Electricity', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'Wind Electricity', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
+  { sourceType: 'On-site Solar', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
+  { sourceType: 'On-site Wind', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
   { sourceType: 'Diesel', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 2.68, factorUnit: 'kgCO2e/litre' },
   { sourceType: 'Petrol', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 2.31, factorUnit: 'kgCO2e/litre' },
   { sourceType: 'LPG', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 1.51, factorUnit: 'kgCO2e/litre' },
@@ -24,7 +25,6 @@ const SOURCE_OPTIONS = [
   { sourceType: 'Coal', activityType: 'fuel', unit: 'kg', scope: 'scope-1', factor: 2.42, factorUnit: 'kgCO2e/kg' },
   { sourceType: 'Purchased Steam', activityType: 'steam', unit: 'kg', scope: 'scope-2', factor: 0.184, factorUnit: 'kgCO2e/kg' },
   { sourceType: 'Purchased Heat', activityType: 'heat', unit: 'kWh', scope: 'scope-2', factor: 0.184, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'Other Fuel', activityType: 'other', unit: 'unit', scope: 'scope-1', factor: 1, factorUnit: 'kgCO2e/unit' },
 ] as const;
 
 export default function EnergyTracking({
@@ -32,10 +32,12 @@ export default function EnergyTracking({
   productionRecords = [],
   facilities,
   onAddRecord,
+  onUpdateRecord,
   onAddProduction,
   onDeleteRecord,
 }: EnergyProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [facilityId, setFacilityId] = useState(facilities[0]?.id || '');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportingPeriod, setReportingPeriod] = useState('FY 2025-26');
@@ -54,6 +56,10 @@ export default function EnergyTracking({
   const [productionNotes, setProductionNotes] = useState('');
   const [filterFacility, setFilterFacility] = useState('all');
   const [filterType, setFilterType] = useState('all');
+  const [filterScope, setFilterScope] = useState('all');
+  const [filterPeriod, setFilterPeriod] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
 
   const selectedSource = SOURCE_OPTIONS.find((option) => option.sourceType === sourceType) ?? SOURCE_OPTIONS[0];
   const parsedQuantity = Number(quantity);
@@ -68,6 +74,30 @@ export default function EnergyTracking({
     setUnit(next.unit);
   };
 
+  const resetActivityForm = () => {
+    setQuantity('');
+    setNotes('');
+    setSourceDocument('');
+    setEditingRecordId(null);
+    setShowAddForm(false);
+  };
+
+  const handleEditRecord = (record: EnergyRecord) => {
+    const recordSource = record.sourceType || record.energyType;
+    const matched = SOURCE_OPTIONS.find((option) => option.sourceType === recordSource) ?? SOURCE_OPTIONS[0];
+    setEditingRecordId(record.id);
+    setFacilityId(record.facilityId);
+    setDate(record.date);
+    setReportingPeriod(record.reportingPeriod);
+    setSourceType(matched.sourceType);
+    setActivityType(matched.activityType);
+    setUnit(matched.unit);
+    setQuantity(String(record.quantity ?? ''));
+    setSourceDocument(record.sourceDocument ?? '');
+    setNotes(record.notes ?? '');
+    setShowAddForm(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!facilityId || !sourceType || !quantity) {
@@ -75,7 +105,7 @@ export default function EnergyTracking({
       return;
     }
 
-    onAddRecord({
+    const payload = {
       facilityId,
       date,
       reportingPeriod,
@@ -86,12 +116,15 @@ export default function EnergyTracking({
       unit,
       sourceDocument: sourceDocument || 'Manual Entry',
       notes,
-    });
+    };
 
-    setQuantity('');
-    setNotes('');
-    setSourceDocument('');
-    setShowAddForm(false);
+    if (editingRecordId && onUpdateRecord) {
+      onUpdateRecord(editingRecordId, payload);
+    } else {
+      onAddRecord(payload);
+    }
+
+    resetActivityForm();
   };
 
   const handleProductionSubmit = (e: React.FormEvent) => {
@@ -120,7 +153,11 @@ export default function EnergyTracking({
     const recordSource = record.sourceType || record.energyType;
     const matchFac = filterFacility === 'all' || record.facilityId === filterFacility;
     const matchType = filterType === 'all' || recordSource === filterType;
-    return matchFac && matchType;
+    const matchScope = filterScope === 'all' || record.scope === filterScope;
+    const matchPeriod = !filterPeriod || record.reportingPeriod.toLowerCase().includes(filterPeriod.toLowerCase());
+    const matchDateFrom = !filterDateFrom || record.date >= filterDateFrom;
+    const matchDateTo = !filterDateTo || record.date <= filterDateTo;
+    return matchFac && matchType && matchScope && matchPeriod && matchDateFrom && matchDateTo;
   });
 
   return (
@@ -133,7 +170,13 @@ export default function EnergyTracking({
           </p>
         </div>
         <button
-          onClick={() => setShowAddForm(!showAddForm)}
+          onClick={() => {
+            if (showAddForm) {
+              resetActivityForm();
+            } else {
+              setShowAddForm(true);
+            }
+          }}
           className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> {showAddForm ? 'Close Entry Form' : 'Log Activity Record'}
@@ -144,7 +187,7 @@ export default function EnergyTracking({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
           <div className="bg-white border border-brand-border rounded-xl p-5 lg:col-span-2 space-y-4">
             <h3 className="font-bold text-sm font-mono uppercase tracking-wider text-brand-charcoal flex items-center gap-1">
-              <Calendar className="w-4 h-4 text-brand-forest" /> Manual Activity Logging
+              <Calendar className="w-4 h-4 text-brand-forest" /> {editingRecordId ? 'Edit Activity Record' : 'Manual Activity Logging'}
             </h3>
 
             <form onSubmit={handleSubmit} className="text-xs space-y-4">
@@ -226,11 +269,11 @@ export default function EnergyTracking({
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowAddForm(false)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-all cursor-pointer">
+                <button type="button" onClick={resetActivityForm} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-all cursor-pointer">
                   Cancel
                 </button>
                 <button type="submit" className="px-5 py-2 bg-brand-forest hover:bg-brand-green-sec text-white rounded text-xs font-bold transition-all cursor-pointer">
-                  Commit Activity Record
+                  {editingRecordId ? 'Update Activity Record' : 'Commit Activity Record'}
                 </button>
               </div>
             </form>
@@ -311,11 +354,11 @@ export default function EnergyTracking({
       </div>
 
       <div className="bg-white border border-brand-border rounded-xl p-5">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5 border-b border-brand-border/40 pb-4">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-5 border-b border-brand-border/40 pb-4">
           <h2 className="text-sm font-bold font-mono uppercase tracking-wider text-brand-charcoal flex items-center gap-1.5">
             <Filter className="w-4 h-4 text-brand-forest" /> Activity Ledger ({filteredRecords.length} entries)
           </h2>
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 text-xs w-full xl:w-auto">
             <select value={filterFacility} onChange={(e) => setFilterFacility(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
               <option value="all">All Facilities</option>
               {facilities.map((facility) => (
@@ -328,6 +371,14 @@ export default function EnergyTracking({
                 <option key={option.sourceType} value={option.sourceType}>{option.sourceType}</option>
               ))}
             </select>
+            <select value={filterScope} onChange={(e) => setFilterScope(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
+              <option value="all">All Scopes</option>
+              <option value="scope-1">Scope 1</option>
+              <option value="scope-2">Scope 2</option>
+            </select>
+            <input value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} placeholder="Reporting period" className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
+            <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
+            <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
           </div>
         </div>
 
@@ -343,7 +394,7 @@ export default function EnergyTracking({
                 <th className="p-3 text-right">Emissions</th>
                 <th className="p-3">Evidence</th>
                 <th className="p-3">Factor Used</th>
-                {onDeleteRecord && <th className="p-3 text-right">Actions</th>}
+                {(onUpdateRecord || onDeleteRecord) && <th className="p-3 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border/40">
@@ -377,15 +428,28 @@ export default function EnergyTracking({
                         </span>
                       </div>
                     </td>
-                    {onDeleteRecord && (
+                    {(onUpdateRecord || onDeleteRecord) && (
                       <td className="p-3 text-right">
-                        <button
-                          onClick={() => onDeleteRecord(record.id)}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded border border-red-100 text-brand-red hover:bg-red-50 transition-colors"
-                          title="Delete activity record"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="inline-flex items-center gap-1">
+                          {onUpdateRecord && (
+                            <button
+                              onClick={() => handleEditRecord(record)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded border border-brand-border text-brand-forest hover:bg-brand-sage/20 transition-colors"
+                              title="Edit activity record"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {onDeleteRecord && (
+                            <button
+                              onClick={() => onDeleteRecord(record.id)}
+                              className="inline-flex items-center justify-center w-8 h-8 rounded border border-red-100 text-brand-red hover:bg-red-50 transition-colors"
+                              title="Delete activity record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -393,7 +457,7 @@ export default function EnergyTracking({
               })}
               {filteredRecords.length === 0 && (
                 <tr>
-                  <td colSpan={onDeleteRecord ? 9 : 8} className="text-center text-gray-400 py-12 font-mono">
+                  <td colSpan={(onUpdateRecord || onDeleteRecord) ? 9 : 8} className="text-center text-gray-400 py-12 font-mono">
                     No matching activity records registered in this tenant context.
                   </td>
                 </tr>

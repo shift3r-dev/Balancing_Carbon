@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { Suspense, lazy, useState, useEffect } from "react";
 import {
   ShieldCheck,
   ArrowRight,
@@ -24,6 +24,8 @@ import {
   Calculator,
   FileCheck,
   FolderClosed,
+  Database,
+  Info,
 } from "lucide-react";
 
 // Brand & Modular Components
@@ -39,17 +41,38 @@ import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
 import DocumentCentre from "./components/DocumentCentre.tsx";
 import AIAssistantModule from "./components/AIAssistantModule.tsx";
 
+const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
+const ServiceFirstFlow = lazy(() => import("./components/ServiceFirstFlow.tsx"));
+const SectorServicesFlow = lazy(() => import("./components/SectorServicesFlow.tsx"));
+const CarbonIntelligenceHub = lazy(() => import("./components/CarbonIntelligenceHub.tsx"));
+
 // Shared interfaces
 import {
   Facility,
   EnergyRecord,
   ProductionRecord,
+  DataCompletenessResult,
+  DecarbonizationProject,
+  DiagnosticFinding,
+  DiagnosticQuestionResponse,
   ESGQuestion,
   OEMQuestionnaire,
   Document,
   Organisation,
+  ReductionOpportunity,
+  ReductionScenario,
+  MonthComparison,
   ViewState,
 } from "./types.ts";
+
+function DashboardModuleLoader({ label }: { label: string }) {
+  return (
+    <div className="min-h-80 bg-white border border-brand-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-xs font-mono text-gray-400">
+      <RefreshCw className="w-6 h-6 animate-spin text-brand-forest" />
+      <span>{label}</span>
+    </div>
+  );
+}
 
 export default function App() {
   // Navigation & User session states
@@ -90,10 +113,14 @@ export default function App() {
   const [oemSurveys, setOemSurveys] = useState<OEMQuestionnaire[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [diagnosticFindings, setDiagnosticFindings] = useState<DiagnosticFinding[]>([]);
+  const [diagnosticCompleteness, setDiagnosticCompleteness] = useState<DataCompletenessResult | null>(null);
+  const [diagnosticComparison, setDiagnosticComparison] = useState<MonthComparison | null>(null);
+  const [diagnosticResponses, setDiagnosticResponses] = useState<DiagnosticQuestionResponse[]>([]);
+  const [opportunities, setOpportunities] = useState<ReductionOpportunity[]>([]);
+  const [scenarios, setScenarios] = useState<ReductionScenario[]>([]);
+  const [projects, setProjects] = useState<DecarbonizationProject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [homeScopeType, setHomeScopeType] = useState<
-    "scope-1" | "scope-2" | "scope-3"
-  >("scope-1");
   const [reportTitle, setReportTitle] = useState("");
   const [reportType, setReportType] = useState("BRSR Core Audit Report");
   const [reportPeriod, setReportPeriod] = useState("FY 2025-26");
@@ -117,6 +144,10 @@ export default function App() {
           "/api/oem-surveys",
           "/api/documents",
           "/api/reports",
+          "/api/opportunities",
+          "/api/scenarios",
+          "/api/projects",
+          "/api/diagnostic-responses",
         ];
 
         const savedSession = localStorage.getItem("balancing_carbon_session");
@@ -157,6 +188,10 @@ export default function App() {
         const oemData = await safeJson(responses[5], []);
         const docData = await safeJson(responses[6], []);
         const repData = await safeJson(responses[7], []);
+        const opportunityData = await safeJson(responses[8], []);
+        const scenarioData = await safeJson(responses[9], []);
+        const projectData = await safeJson(responses[10], []);
+        const diagnosticResponseData = await safeJson(responses[11], []);
 
         setOrganisation(orgData);
         setFacilities(
@@ -180,6 +215,26 @@ export default function App() {
           Array.isArray(docData) ? docData : (docData?.documents ?? []),
         );
         setReports(Array.isArray(repData) ? repData : (repData?.reports ?? []));
+        setOpportunities(
+          Array.isArray(opportunityData)
+            ? opportunityData
+            : (opportunityData?.opportunities ?? []),
+        );
+        setScenarios(
+          Array.isArray(scenarioData)
+            ? scenarioData
+            : (scenarioData?.scenarios ?? []),
+        );
+        setProjects(
+          Array.isArray(projectData)
+            ? projectData
+            : (projectData?.projects ?? []),
+        );
+        setDiagnosticResponses(
+          Array.isArray(diagnosticResponseData)
+            ? diagnosticResponseData
+            : (diagnosticResponseData?.responses ?? []),
+        );
       } catch (err) {
         console.error("Error fetching seeded multi-tenant states:", err);
       } finally {
@@ -352,6 +407,36 @@ export default function App() {
     }
   };
 
+  const handleUpdateRecord = async (id: string, payload: any) => {
+    try {
+      const updated = await safeFetchJson(`/api/energy/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const updatedRecord = unwrapEntity<EnergyRecord>(updated, [
+        "record",
+        "energyRecord",
+      ]);
+      if (updatedRecord?.id) {
+        setRecords((prev) =>
+          prev.map((record) => (record.id === id ? updatedRecord : record)),
+        );
+      }
+
+      const facData = await safeFetchJson("/api/facilities", undefined, []);
+      const energyData = await safeFetchJson("/api/energy", undefined, []);
+      setFacilities(
+        Array.isArray(facData) ? facData : (facData?.facilities ?? []),
+      );
+      setRecords(
+        Array.isArray(energyData) ? energyData : (energyData?.records ?? []),
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleAddProduction = async (payload: any) => {
     try {
       const newProduction = await safeFetchJson("/api/production", {
@@ -375,6 +460,84 @@ export default function App() {
       );
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleRefreshDiagnostics = async (params?: {
+    facilityId?: string;
+    startDate?: string;
+    endDate?: string;
+    currentMonth?: string;
+    previousMonth?: string;
+  }) => {
+    const query = new URLSearchParams();
+    Object.entries(params ?? {}).forEach(([key, value]) => {
+      if (value) query.set(key, value);
+    });
+    const diagnostics = await safeFetchJson(
+      `/api/diagnostics${query.toString() ? `?${query.toString()}` : ""}`,
+      undefined,
+      null,
+    );
+    if (!diagnostics) return;
+    setDiagnosticFindings(diagnostics.findings ?? []);
+    setDiagnosticCompleteness(diagnostics.completeness ?? null);
+    setDiagnosticComparison(diagnostics.comparison ?? null);
+    setDiagnosticResponses(diagnostics.responses ?? []);
+  };
+
+  const handleSaveDiagnosticResponse = async (payload: any) => {
+    const saved = await safeFetchJson("/api/diagnostic-responses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const response = unwrapEntity<DiagnosticQuestionResponse>(saved, ["response"]);
+    if (response?.id) {
+      setDiagnosticResponses((prev) => {
+        const next = prev.filter((item) => item.id !== response.id);
+        return [response, ...next];
+      });
+    }
+  };
+
+  const handleCreateOpportunity = async (payload: any) => {
+    const created = await safeFetchJson("/api/opportunities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const opportunity = unwrapEntity<ReductionOpportunity>(created, ["opportunity"]);
+    if (opportunity?.id) setOpportunities((prev) => [opportunity, ...prev]);
+  };
+
+  const handleCreateScenario = async (payload: any) => {
+    const created = await safeFetchJson("/api/scenarios", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const scenario = unwrapEntity<ReductionScenario>(created, ["scenario"]);
+    if (scenario?.id) setScenarios((prev) => [scenario, ...prev]);
+  };
+
+  const handleCreateProject = async (payload: any) => {
+    const created = await safeFetchJson("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const project = unwrapEntity<DecarbonizationProject>(created, ["project"]);
+    if (project?.id) {
+      setProjects((prev) => [project, ...prev]);
+      if (project.opportunityId) {
+        const opportunityData = await safeFetchJson("/api/opportunities", undefined, []);
+        setOpportunities(
+          Array.isArray(opportunityData)
+            ? opportunityData
+            : (opportunityData?.opportunities ?? []),
+        );
+      }
     }
   };
 
@@ -988,12 +1151,16 @@ export default function App() {
               <>
                 {currentView === "dashboard-overview" && (
                   <DashboardOverview
+                    organisation={organisation}
                     facilities={facilities}
                     records={records}
                     productionRecords={productionRecords}
                     esgQuestions={esgQuestions}
                     oemSurveys={oemSurveys}
                     documents={documents}
+                    reports={reports}
+                    opportunities={opportunities}
+                    projects={projects}
                     onNavigate={setCurrentView}
                   />
                 )}
@@ -1011,9 +1178,20 @@ export default function App() {
                     productionRecords={productionRecords}
                     facilities={facilities}
                     onAddRecord={handleAddRecord}
+                    onUpdateRecord={handleUpdateRecord}
                     onAddProduction={handleAddProduction}
                     onDeleteRecord={handleDeleteRecord}
                   />
+                )}
+                {currentView === "dashboard-calculator" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading calculator..." />}>
+                    <PublicCarbonCalculator
+                      onRegister={() => setCurrentView("dashboard-energy")}
+                      ctaTitle="Move Estimate Into Activity Ledger"
+                      ctaDescription="Use this sandbox for quick modelling, then enter real electricity, fuel, production, evidence, and factor-backed records in the Energy Ledger so dashboard totals remain traceable."
+                      ctaButtonLabel="Open Energy Ledger"
+                    />
+                  </Suspense>
                 )}
 
                 {/* Carbon engine explorer views */}
@@ -1037,6 +1215,25 @@ export default function App() {
                     facilities={facilities}
                     records={records}
                   />
+                )}
+                {currentView === "dashboard-intelligence" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading Carbon Intelligence..." />}>
+                    <CarbonIntelligenceHub
+                      facilities={facilities}
+                      findings={diagnosticFindings}
+                      completeness={diagnosticCompleteness}
+                      comparison={diagnosticComparison}
+                      diagnosticResponses={diagnosticResponses}
+                      opportunities={opportunities}
+                      scenarios={scenarios}
+                      projects={projects}
+                      onRefreshDiagnostics={handleRefreshDiagnostics}
+                      onSaveDiagnosticResponse={handleSaveDiagnosticResponse}
+                      onCreateOpportunity={handleCreateOpportunity}
+                      onCreateScenario={handleCreateScenario}
+                      onCreateProject={handleCreateProject}
+                    />
+                  </Suspense>
                 )}
 
                 {/* ESG & Surveys */}
@@ -1088,7 +1285,7 @@ export default function App() {
       id="public-website"
     >
       {/* Public Header bar with Asymmetric logo */}
-      <header className="bg-white border-b border-brand-border/60 h-20 flex items-center sticky top-0 z-[100] px-6">
+      <header className="bg-white border-b border-brand-border/60 min-h-24 flex items-center sticky top-0 z-[100] px-6 py-3">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
           <button
             onClick={() => setCurrentView("home")}
@@ -1098,71 +1295,64 @@ export default function App() {
           </button>
 
           {/* Desktop Links */}
-          <nav className="hidden md:flex items-center gap-8 text-xs font-bold font-mono tracking-wide text-brand-charcoal">
-            <button
-              onClick={() => setCurrentView("home")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "home" ? "text-brand-forest border-b-2 border-brand-forest pb-1" : ""}`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => setCurrentView("services")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "services" ? "text-brand-forest border-b-2 border-brand-forest pb-1" : ""}`}
-            >
-              Services
-            </button>
+          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-bold font-mono tracking-wide text-brand-charcoal">
             <button
               onClick={() => setCurrentView("industries")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "industries" ? "text-brand-forest border-b-2 border-brand-forest pb-1" : ""}`}
+              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "industries" ? "text-brand-forest" : "text-gray-500"}`}
             >
-              Industries
+              <ShieldCheck className="w-3.5 h-3.5" /> Services (Sector-First)
             </button>
             <button
               onClick={() => setCurrentView("public-calculator")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer text-brand-forest flex items-center gap-1 font-extrabold ${currentView === "public-calculator" ? "border-b-2 border-brand-forest pb-1" : ""}`}
+              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "public-calculator" ? "text-brand-forest" : "text-gray-500"}`}
             >
-              <Calculator className="w-3.5 h-3.5" /> Carbon Calculator
+              <FileText className="w-3.5 h-3.5" /> Resources
             </button>
             <button
-              onClick={() => setCurrentView("assessment")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "assessment" ? "text-brand-forest border-b-2 border-brand-forest pb-1" : ""}`}
+              onClick={() => setCurrentView("services")}
+              className={`px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer ${
+                currentView === "services"
+                  ? "bg-brand-charcoal text-white"
+                  : "bg-brand-charcoal text-white hover:bg-black"
+              }`}
             >
-              Free Assessment
+              <Database className="w-3.5 h-3.5 text-brand-sage" /> All Services
+              (Service-First)
             </button>
             <button
               onClick={() => setCurrentView("about")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "about" ? "text-brand-forest border-b-2 border-brand-forest pb-1" : ""}`}
+              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "about" ? "text-brand-forest" : "text-gray-500"}`}
             >
-              Our Vision
+              <Info className="w-3.5 h-3.5" /> About Us
             </button>
           </nav>
 
           {/* Action Login triggers */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 xl:gap-3">
             <button
               onClick={() => {
                 setIsSignUpMode(false);
                 setCurrentView("login");
               }}
-              className="text-xs font-mono font-bold hover:text-brand-forest px-4 py-2"
+              className="text-xs font-mono font-bold text-gray-500 hover:text-brand-forest px-3 py-2 rounded-lg border border-transparent hover:border-brand-border transition-all flex items-center gap-1.5"
             >
-              Sign In
+              <Lock className="w-3.5 h-3.5" /> Sign In
             </button>
             <button
               onClick={() => {
                 setIsSignUpMode(true);
                 setCurrentView("login");
               }}
-              className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 transition-all cursor-pointer"
+              className="text-xs font-mono font-bold text-brand-forest hover:text-white px-3 py-2 rounded-lg border border-brand-forest/30 hover:bg-brand-forest transition-all flex items-center gap-1.5"
             >
-              Register Company <ArrowRight className="w-3.5 h-3.5" />
+              <Building className="w-3.5 h-3.5" /> Register
             </button>
           </div>
 
           {/* Mobile menu hamburger toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-brand-charcoal hover:text-brand-forest"
+            className="lg:hidden text-brand-charcoal hover:text-brand-forest"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
@@ -1175,25 +1365,7 @@ export default function App() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-white border-b border-brand-border/60 py-4 px-6 space-y-3 font-mono font-bold text-xs">
-          <button
-            onClick={() => {
-              setCurrentView("home");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
-          >
-            Home
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("services");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
-          >
-            Services
-          </button>
+        <div className="lg:hidden bg-white border-b border-brand-border/60 py-4 px-6 space-y-3 font-mono font-bold text-xs">
           <button
             onClick={() => {
               setCurrentView("industries");
@@ -1201,25 +1373,25 @@ export default function App() {
             }}
             className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
           >
-            Industries
+            Services (Sector-First)
           </button>
           <button
             onClick={() => {
               setCurrentView("public-calculator");
               setMobileMenuOpen(false);
             }}
-            className="block w-full text-left py-2 text-brand-forest hover:text-brand-green-sec flex items-center gap-1.5 font-extrabold"
+            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
           >
-            <Calculator className="w-4 h-4" /> Carbon Calculator
+            Resources & Calculator
           </button>
           <button
             onClick={() => {
-              setCurrentView("assessment");
+              setCurrentView("services");
               setMobileMenuOpen(false);
             }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
+            className="block w-full text-left py-2 text-brand-forest hover:text-brand-green-sec flex items-center gap-1.5 font-extrabold"
           >
-            Free Assessment
+            <Database className="w-4 h-4" /> All Services (Service-First)
           </button>
           <button
             onClick={() => {
@@ -1228,7 +1400,7 @@ export default function App() {
             }}
             className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
           >
-            Our Vision
+            About Us
           </button>
           <div className="border-t border-brand-border/40 pt-3 flex flex-col gap-2">
             <button
@@ -1237,7 +1409,7 @@ export default function App() {
                 setCurrentView("login");
                 setMobileMenuOpen(false);
               }}
-              className="w-full text-center py-2 text-gray-600 border border-brand-border rounded"
+              className="w-full text-center py-2 text-brand-charcoal border border-brand-border rounded"
             >
               Sign In
             </button>
@@ -1633,265 +1805,29 @@ export default function App() {
 
         {/* View: Dedicated Public Carbon Calculator */}
         {currentView === "public-calculator" && (
-          <div className="max-w-6xl mx-auto px-6 py-12 space-y-8">
-            <div className="text-center space-y-3 max-w-3xl mx-auto">
-              <span className="text-[10px] font-mono uppercase text-brand-forest tracking-widest font-bold bg-brand-sage/20 px-3 py-1 rounded-full">
-                Interactive Carbon Accounting Logic
-              </span>
-              <h1 className="text-3xl sm:text-4xl font-black text-brand-charcoal tracking-tight">
-                Instant Carbon Accounting Sandbox
-              </h1>
-              <p className="text-xs sm:text-sm text-gray-500 leading-relaxed">
-                Calculate direct and indirect greenhouse gas values instantly
-                using official emission coefficients. Fully aligned with SEBI
-                BRSR Core and EU CBAM filing standards, this public tool
-                demonstrates the underlying calculations of our secure
-                multi-tenant platform.
-              </p>
-            </div>
-
-            {/* Main tabbed card matching simpler interface than dashboard but dedicated and professional */}
-            <div className="bg-white border border-brand-border rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-brand-border/60 pb-6">
-                <div>
-                  <h3 className="text-sm font-extrabold text-brand-charcoal font-mono uppercase tracking-wide">
-                    Select Accounting Scope
-                  </h3>
-                  <p className="text-[11px] text-gray-400">
-                    Emission factors are calibrated to IPCC and Central
-                    Electricity Authority (CEA) of India coefficients.
-                  </p>
-                </div>
-
-                {/* Tabs for Scope selection */}
-                <div className="flex flex-wrap gap-1.5 bg-brand-offwhite p-1 rounded-xl border border-brand-border/60">
-                  <button
-                    onClick={() => setHomeScopeType("scope-1")}
-                    className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                      homeScopeType === "scope-1"
-                        ? "bg-brand-charcoal text-white shadow-sm"
-                        : "text-gray-500 hover:text-brand-charcoal"
-                    }`}
-                  >
-                    Scope 1 (Direct Fuel)
-                  </button>
-                  <button
-                    onClick={() => setHomeScopeType("scope-2")}
-                    className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                      homeScopeType === "scope-2"
-                        ? "bg-brand-charcoal text-white shadow-sm"
-                        : "text-gray-500 hover:text-brand-charcoal"
-                    }`}
-                  >
-                    Scope 2 (Electricity Grid)
-                  </button>
-                  <button
-                    onClick={() => setHomeScopeType("scope-3")}
-                    className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                      homeScopeType === "scope-3"
-                        ? "bg-brand-charcoal text-white shadow-sm"
-                        : "text-gray-500 hover:text-brand-charcoal"
-                    }`}
-                  >
-                    Scope 3 (Supply Chain)
-                  </button>
-                </div>
-              </div>
-
-              {/* Carbon Engine UI rendering */}
-              <div className="transition-all duration-300">
-                <CarbonEngineUI
-                  scopeType={homeScopeType}
-                  facilities={facilities}
-                  records={records}
-                />
-              </div>
-            </div>
-
-            {/* Simpler Interface than dashboard informational footer block */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-brand-sage/10 rounded-2xl p-6 border border-brand-sage/25 text-xs text-gray-600">
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-brand-forest font-mono uppercase text-[11px] tracking-wider">
-                  How does the Sandbox differ from the Enterprise Dashboard?
-                </h4>
-                <p className="leading-relaxed text-[11.5px]">
-                  The <strong>Public Sandbox</strong> operates in stateless
-                  guest mode, letting you run ad-hoc calculations on individual
-                  fuel combustion quantities or electricity grid values. It has
-                  a lightweight, non-relational interface.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <h4 className="font-extrabold text-brand-forest font-mono uppercase text-[11px] tracking-wider">
-                  Enterprise Client Capabilities
-                </h4>
-                <p className="leading-relaxed text-[11.5px]">
-                  By signing in to your tenant account, you unlock secure
-                  multi-facility aggregations, physical utility bill upload
-                  processing with automated OCR document verification, audit
-                  trail logs reviewed by qualified officers, and downloadable
-                  compliance packages.
-                </p>
-                <button
-                  onClick={() => {
-                    setIsSignUpMode(true);
-                    setCurrentView("login");
-                  }}
-                  className="text-brand-forest font-mono font-bold hover:underline flex items-center gap-1 mt-1 text-[11px]"
-                >
-                  Register Enterprise Tenant <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <Suspense fallback={<DashboardModuleLoader label="Loading calculator..." />}>
+            <PublicCarbonCalculator
+              onRegister={() => {
+                setIsSignUpMode(true);
+                setCurrentView("login");
+              }}
+            />
+          </Suspense>
         )}
 
-        {/* View: Services Detail */}
+        {/* View: Services Portfolio */}
         {currentView === "services" && (
-          <div className="max-w-5xl mx-auto px-6 py-16 space-y-12">
-            <div className="text-center space-y-2">
-              <span className="text-[10px] font-mono uppercase bg-brand-sage text-brand-forest px-2.5 py-1 rounded font-bold tracking-widest">
-                Our Capabilities
-              </span>
-              <h1 className="text-3xl font-black text-brand-charcoal tracking-tight">
-                Decarbonization Consulting & ESG Platforms
-              </h1>
-              <p className="text-xs text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                We combine server-side calculated auditing code with technical
-                engineering consultation to keep Indian industrial supply chains
-                compliant and competitive.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
-              <div className="p-6 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <h3 className="font-extrabold text-brand-charcoal text-sm font-mono uppercase tracking-wide">
-                  01 • Scope 1 & 2 Auditing
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Ditch the fragile spreadsheets. Balancing Carbon maps diesel
-                  receipts and smart electric meters directly into our database
-                  ledger using Central Electricity Authority Grid emission
-                  coefficients.
-                </p>
-              </div>
-
-              <div className="p-6 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <h3 className="font-extrabold text-brand-charcoal text-sm font-mono uppercase tracking-wide">
-                  02 • OEM Questionnaire Ingestion
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  We ingest complex auto-OEM compliance documents (Tata Motors,
-                  Mahindra, Maruti Suzuki), classify environmental questions
-                  automatically, search available corporate policies, and
-                  generate high-confidence drafts.
-                </p>
-              </div>
-
-              <div className="p-6 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <h3 className="font-extrabold text-brand-charcoal text-sm font-mono uppercase tracking-wide">
-                  03 • CBAM Carbon Border Assurances
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Track and verify the embedded greenhouse gases of raw steel,
-                  aluminum, and metals shipped to EU borders. Ensure audit
-                  compliance and prevent custom friction points.
-                </p>
-              </div>
-
-              <div className="p-6 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <h3 className="font-extrabold text-brand-charcoal text-sm font-mono uppercase tracking-wide">
-                  04 • Evidence Document Lockers
-                </h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Secure your State Pollution Control Board Consent-to-operate
-                  permits, factory solar power purchase agreements, and verified
-                  carbon declarations in high-security multi-tenant folder
-                  grids.
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setCurrentView("assessment")}
-              className="mx-auto block bg-brand-forest hover:bg-brand-green-sec text-white px-6 py-3 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
-            >
-              Analyze Your Current State <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <Suspense fallback={<DashboardModuleLoader label="Loading services..." />}>
+            <ServiceFirstFlow />
+          </Suspense>
         )}
 
-        {/* View: Industries Detail */}
+        {/* View: Sector-First Services */}
         {currentView === "industries" && (
-          <div className="max-w-5xl mx-auto px-6 py-16 space-y-12">
-            <div className="text-center space-y-2">
-              <span className="text-[10px] font-mono uppercase bg-brand-sage text-brand-forest px-2.5 py-1 rounded font-bold tracking-widest">
-                Target Sectors
-              </span>
-              <h1 className="text-3xl font-black text-brand-charcoal tracking-tight">
-                Tailored to High-Intensity Engineering Hubs
-              </h1>
-              <p className="text-xs text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                Our platform is modeled around the real manufacturing processes
-                and regulatory contexts of Indian industrial exporters.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 text-xs text-gray-500 leading-relaxed">
-              <div className="p-5 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <strong className="text-brand-charcoal text-xs font-mono uppercase tracking-wide block border-b border-brand-border pb-1">
-                  Auto Components
-                </strong>
-                <p>
-                  Tier-1 and Tier-2 manufacturers supplying forgings, stampings,
-                  fasteners, and heavy cast gears. Fully aligned with Tata
-                  Motors and Mahindra supplier audit rules.
-                </p>
-              </div>
-
-              <div className="p-5 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <strong className="text-brand-charcoal text-xs font-mono uppercase tracking-wide block border-b border-brand-border pb-1">
-                  Metalworking & Forging
-                </strong>
-                <p>
-                  Energy-intensive heat treatment lines, boilers, and CNC
-                  machining centers in Ludhiana, Faridabad, and Pune requiring
-                  intense diesel and electricity accounting.
-                </p>
-              </div>
-
-              <div className="p-5 bg-white border border-brand-border rounded-xl space-y-3 shadow-sm">
-                <strong className="text-brand-charcoal text-xs font-mono uppercase tracking-wide block border-b border-brand-border pb-1">
-                  Chemicals & Exporters
-                </strong>
-                <p>
-                  Specialty process lines exporting raw chemicals,
-                  pharmaceutical intermediates, and metal parts subject to CBAM
-                  calculations at European customs ports.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-brand-charcoal text-white rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-mono">
-              <div>
-                <strong className="text-brand-sage block font-bold mb-1">
-                  MSME COMPLIANCE PROGRAM
-                </strong>
-                <span>
-                  Are you a mid-size engineering firm trying to keep your Tier-1
-                  exporter contracts active?
-                </span>
-              </div>
-              <button
-                onClick={() => setCurrentView("assessment")}
-                className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2 rounded font-bold whitespace-nowrap cursor-pointer"
-              >
-                Assess MSME Readiness
-              </button>
-            </div>
-          </div>
+          <Suspense fallback={<DashboardModuleLoader label="Loading sector services..." />}>
+            <SectorServicesFlow />
+          </Suspense>
         )}
-
         {/* View: Free Interactive ESG Assessment form */}
         {currentView === "assessment" && (
           <div className="max-w-5xl mx-auto px-6 py-16">

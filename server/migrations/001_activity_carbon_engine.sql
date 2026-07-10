@@ -39,7 +39,7 @@ insert into emission_factors (
     'Prototype grid factor retained for product testing; do not present as audit-grade.'
   ),
   (
-    'ef-solar-electricity-india-2025-prototype', 'Solar Electricity', 'On-site solar electricity',
+    'ef-onsite-solar-india-2025-prototype', 'On-site Solar', 'On-site solar electricity',
     'scope-2', 0, 'kgCO2e/kWh', 'kWh', array['kWh'], 'India', '2025',
     'Zero direct operational emissions for on-site renewable generation',
     'Prototype factor - replace with documented accounting policy before audit use',
@@ -47,7 +47,7 @@ insert into emission_factors (
     'This is not market-based Scope 2 accounting and does not model certificates or residual mix.'
   ),
   (
-    'ef-wind-electricity-india-2025-prototype', 'Wind Electricity', 'Wind electricity',
+    'ef-onsite-wind-india-2025-prototype', 'On-site Wind', 'On-site wind electricity',
     'scope-2', 0, 'kgCO2e/kWh', 'kWh', array['kWh'], 'India', '2025',
     'Zero direct operational emissions for renewable generation',
     'Prototype factor - replace with documented accounting policy before audit use',
@@ -125,14 +125,6 @@ insert into emission_factors (
     'Prototype factor - replace with supplier-specific source before audit use',
     'Prototype registry seeded by Balancing Carbon migration', '1.0', '2025-04-01', true,
     'Prototype only; supplier-specific heat factors are required for real reporting.'
-  ),
-  (
-    'ef-other-fuel-india-2025-prototype', 'Other Fuel', 'Other direct fuel',
-    'scope-1', 1, 'kgCO2e/unit', 'unit', array['unit'], 'India', '2025',
-    'Placeholder fuel factor',
-    'Prototype factor - replace before use',
-    'Prototype registry seeded by Balancing Carbon migration', '1.0', '2025-04-01', true,
-    'Placeholder only. Do not use for audit reporting.'
   )
 on conflict (id) do update set
   source_type = excluded.source_type,
@@ -145,6 +137,17 @@ on conflict (id) do update set
   source_name = excluded.source_name,
   notes = excluded.notes,
   is_active = excluded.is_active;
+
+update emission_factors
+set
+  is_active = false,
+  valid_to = current_date,
+  notes = coalesce(notes, '') || ' Deactivated by Phase 1 migration cleanup; keep only record-level snapshots for historical calculations.'
+where id in (
+  'ef-solar-electricity-india-2025-prototype',
+  'ef-wind-electricity-india-2025-prototype',
+  'ef-other-fuel-india-2025-prototype'
+);
 
 -- 2. Extend existing energy_records into activity records.
 alter table energy_records

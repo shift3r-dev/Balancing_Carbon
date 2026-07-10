@@ -61,9 +61,9 @@ test('grid electricity calculation uses location-based prototype factor', () => 
   assert.equal(result.emissionsTCO2e, 304.3);
 });
 
-test('wind alias resolves to the wind electricity prototype factor', () => {
+test('wind alias resolves to the on-site wind prototype factor', () => {
   const resolved = factor('wind');
-  assert.equal(resolved.sourceType, 'Wind Electricity');
+  assert.equal(resolved.sourceType, 'On-site Wind');
   assert.equal(resolved.factorValue, 0);
 });
 
@@ -88,6 +88,10 @@ test('invalid unit is rejected', () => {
     sourceType: 'Diesel',
     emissionFactor: factor('Diesel'),
   }), /incompatible/i);
+});
+
+test('missing factor returns null and is not silently treated as zero', () => {
+  assert.equal(resolveEmissionFactor('Unconfigured Fuel'), null);
 });
 
 test('multi-tenant security aggregation must filter by organisation before calculation', () => {
@@ -125,10 +129,10 @@ test('annual aggregation equals sum of monthly records', () => {
 
 test('carbon intensity returns kgCO2e per tonne when denominator is tonnes', () => {
   const aggregate = aggregateFacilityActivities([
-    { facilityId: 'fac-1', sourceType: 'Grid Electricity', quantity: 1, unit: 'kWh', scope: 'scope-2', emissionsTCO2e: 2950.512 },
-  ], 18500, 'tonnes');
+    { facilityId: 'fac-1', sourceType: 'Grid Electricity', quantity: 1, unit: 'kWh', scope: 'scope-2', emissionsTCO2e: 438.6 },
+  ], 1520, 'tonnes');
 
-  assert.equal(Number((aggregate.carbonIntensity * 1000).toFixed(4)), 159.4871);
+  assert.equal(Number((aggregate.carbonIntensity * 1000).toFixed(4)), 288.5526);
 });
 
 test('incompatible production units do not produce misleading intensity', () => {
