@@ -2,11 +2,12 @@
 <html lang="en">
   <head>
     <script>
-      // Safe guard against libraries attempting to overwrite global fetch which is read-only in some environments
-      (function() {
+      // Safe guard against libraries attempting to overwrite global fetch
+      (function () {
         let currentFetch = window.fetch;
+
         try {
-          Object.defineProperty(window, 'fetch', {
+          Object.defineProperty(window, "fetch", {
             get() {
               return currentFetch;
             },
@@ -14,14 +15,16 @@
               currentFetch = val;
             },
             configurable: true,
-            enumerable: true
+            enumerable: true,
           });
         } catch (e) {
-          console.warn('Could not define fetch setter on window:', e);
+          console.warn("Could not define fetch setter on window:", e);
         }
+
         let currentGlobalFetch = globalThis.fetch;
+
         try {
-          Object.defineProperty(globalThis, 'fetch', {
+          Object.defineProperty(globalThis, "fetch", {
             get() {
               return currentGlobalFetch;
             },
@@ -29,20 +32,65 @@
               currentGlobalFetch = val;
             },
             configurable: true,
-            enumerable: true
+            enumerable: true,
           });
         } catch (e) {
-          console.warn('Could not define fetch setter on globalThis:', e);
+          console.warn("Could not define fetch setter on globalThis:", e);
         }
       })();
     </script>
+
+    <!-- Basic -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+
+    <!-- SEO -->
+    <title>Balancing Carbon | Industrial Carbon Intelligence Platform</title>
+
+    <meta
+      name="description"
+      content="Balancing Carbon is an enterprise carbon intelligence platform for industrial decarbonization, ESG reporting, emissions accounting, compliance, and sustainability analytics."
+    />
+
+    <meta
+      name="keywords"
+      content="Carbon Accounting, ESG, Sustainability, Carbon Intelligence, Scope 1, Scope 2, Scope 3, Emissions, Manufacturing, Industrial Decarbonization, Carbon Credits"
+    />
+
+    <meta name="author" content="Balancing Carbon" />
+    <meta name="theme-color" content="#2E6B3D" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Balancing Carbon" />
+    <meta
+      property="og:description"
+      content="Industrial Carbon Intelligence Platform"
+    />
+    <meta property="og:type" content="website" />
+
+    <!-- Favicons -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="/favicon-16x16.png"
+    />
+
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <link rel="manifest" href="/site.webmanifest" />
   </head>
+
   <body>
     <div id="root"></div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
