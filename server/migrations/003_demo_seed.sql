@@ -26,7 +26,7 @@ begin
 
   select organisation_id into org_id
   from profiles
-  where id = target_user_id
+  where id::text = target_user_id::text
   limit 1;
 
   if org_id is null then

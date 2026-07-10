@@ -40,6 +40,7 @@ import ESGAssessmentModule from "./components/ESGAssessmentModule.tsx";
 import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
 import DocumentCentre from "./components/DocumentCentre.tsx";
 import AIAssistantModule from "./components/AIAssistantModule.tsx";
+import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
 const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
 const ServiceFirstFlow = lazy(() => import("./components/ServiceFirstFlow.tsx"));
@@ -150,48 +151,24 @@ export default function App() {
           "/api/diagnostic-responses",
         ];
 
-        const savedSession = localStorage.getItem("balancing_carbon_session");
-        const session = savedSession ? JSON.parse(savedSession) : null;
-        const token = session?.token ?? session?.accessToken;
-        const headers: Record<string, string> = token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const headers = getAuthenticatedHeaders();
 
         const responses = await Promise.all(
           endpoints.map((url) => fetch(url, { headers })),
         );
 
-        const safeJson = async (res: Response, fallback: any) => {
-          if (!res.ok) {
-            console.error(
-              `Fetch failed for ${res.url} with status ${res.status}`,
-            );
-            return fallback;
-          }
-          try {
-            const text = await res.text();
-            if (!text || text.trim() === "" || text.trim() === "undefined") {
-              return fallback;
-            }
-            return JSON.parse(text);
-          } catch (e) {
-            console.error(`Error parsing JSON for ${res.url}:`, e);
-            return fallback;
-          }
-        };
-
-        const orgData = await safeJson(responses[0], null);
-        const facData = await safeJson(responses[1], []);
-        const energyData = await safeJson(responses[2], []);
-        const productionData = await safeJson(responses[3], []);
-        const esgData = await safeJson(responses[4], []);
-        const oemData = await safeJson(responses[5], []);
-        const docData = await safeJson(responses[6], []);
-        const repData = await safeJson(responses[7], []);
-        const opportunityData = await safeJson(responses[8], []);
-        const scenarioData = await safeJson(responses[9], []);
-        const projectData = await safeJson(responses[10], []);
-        const diagnosticResponseData = await safeJson(responses[11], []);
+        const orgData = await parseJsonResponse(responses[0], null);
+        const facData = await parseJsonResponse(responses[1], []);
+        const energyData = await parseJsonResponse(responses[2], []);
+        const productionData = await parseJsonResponse(responses[3], []);
+        const esgData = await parseJsonResponse(responses[4], []);
+        const oemData = await parseJsonResponse(responses[5], []);
+        const docData = await parseJsonResponse(responses[6], []);
+        const repData = await parseJsonResponse(responses[7], []);
+        const opportunityData = await parseJsonResponse(responses[8], []);
+        const scenarioData = await parseJsonResponse(responses[9], []);
+        const projectData = await parseJsonResponse(responses[10], []);
+        const diagnosticResponseData = await parseJsonResponse(responses[11], []);
 
         setOrganisation(orgData);
         setFacilities(
@@ -243,45 +220,6 @@ export default function App() {
     }
     fetchInitialData();
   }, [authenticated, currentUser]);
-
-  // Safe fetch helper for inline mutations
-  const safeFetchJson = async (
-    url: string,
-    options?: RequestInit,
-    fallback: any = null,
-  ) => {
-    try {
-      const headers = {
-        ...(options?.headers || {}),
-        "Content-Type": "application/json",
-      } as Record<string, string>;
-
-      const savedSession = localStorage.getItem("balancing_carbon_session");
-      const session = savedSession ? JSON.parse(savedSession) : null;
-      const token = session?.token ?? session?.accessToken;
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const res = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      if (!res.ok) {
-        console.error(`Request failed for ${url}: status ${res.status}`);
-        return fallback;
-      }
-      const text = await res.text();
-      if (!text || text.trim() === "" || text.trim() === "undefined") {
-        return fallback;
-      }
-      return JSON.parse(text);
-    } catch (err) {
-      console.error(`Error in safeFetchJson for ${url}:`, err);
-      return fallback;
-    }
-  };
 
   const unwrapEntity = <T,>(response: any, keys: string[]): T | null => {
     if (!response) return null;
