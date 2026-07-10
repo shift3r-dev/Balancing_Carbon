@@ -7,11 +7,12 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
-import { Facility, EnergyRecord, ESGQuestion, OEMQuestionnaire, Document, ViewState } from '../types.ts';
+import { Facility, EnergyRecord, ProductionRecord, ESGQuestion, OEMQuestionnaire, Document, ViewState } from '../types.ts';
 
 interface OverviewProps {
   facilities: Facility[];
   records: EnergyRecord[];
+  productionRecords?: ProductionRecord[];
   esgQuestions: ESGQuestion[];
   oemSurveys: OEMQuestionnaire[];
   documents: Document[];
@@ -36,6 +37,7 @@ const clampPercentage = (value: number): number => {
 export default function DashboardOverview({ 
   facilities, 
   records, 
+  productionRecords = [],
   esgQuestions, 
   oemSurveys, 
   documents,
@@ -43,27 +45,56 @@ export default function DashboardOverview({
 }: OverviewProps) {
 
   // Calculations
-  const totalScope1 = facilities.reduce((sum, f) => sum + f.emissionsScope1, 0);
-  const totalScope2 = facilities.reduce((sum, f) => sum + f.emissionsScope2, 0);
+  const hasActivityRecords = records.length > 0;
+  const recordEmission = (record: EnergyRecord) => Number(record.emissionsTCO2e ?? record.emissions ?? 0);
+  const totalScope1 = hasActivityRecords
+    ? records.filter((record) => record.scope === 'scope-1').reduce((sum, record) => sum + recordEmission(record), 0)
+    : facilities.reduce((sum, f) => sum + f.emissionsScope1, 0);
+  const totalScope2 = hasActivityRecords
+    ? records.filter((record) => record.scope === 'scope-2').reduce((sum, record) => sum + recordEmission(record), 0)
+    : facilities.reduce((sum, f) => sum + f.emissionsScope2, 0);
   const totalEmissions = totalScope1 + totalScope2;
 
-  const totalElectricity = facilities.reduce((sum, f) => sum + f.electricityConsumption, 0);
-  const totalRenewable = facilities.reduce((sum, f) => sum + f.renewableEnergyUsage, 0);
+  const totalElectricity = hasActivityRecords
+    ? records.filter((record) => record.scope === 'scope-2').reduce((sum, record) => sum + record.quantity, 0)
+    : facilities.reduce((sum, f) => sum + f.electricityConsumption, 0);
+  const totalRenewable = hasActivityRecords
+    ? records.filter((record) => record.activityType === 'renewable-electricity').reduce((sum, record) => sum + record.quantity, 0)
+    : facilities.reduce((sum, f) => sum + f.renewableEnergyUsage, 0);
   const renewableRatio = totalElectricity > 0 ? (totalRenewable / totalElectricity) * 100 : 0;
 
-  const totalProduction = facilities.reduce((sum, f) => sum + f.productionOutput, 0);
+  const productionUnitIsTonne = (unit: string) => {
+    const normalized = unit.toLowerCase();
+    return normalized.includes('tonne') || normalized === 't' || normalized === 'ton';
+  };
+  const compatibleProductionRecords = productionRecords.filter((record) => productionUnitIsTonne(record.unit));
+  const totalProduction = compatibleProductionRecords.length > 0
+    ? compatibleProductionRecords.reduce((sum, record) => sum + Number(record.quantity ?? 0), 0)
+    : facilities.reduce((sum, f) => sum + f.productionOutput, 0);
   const averageIntensity = totalProduction > 0 ? (totalEmissions / totalProduction) : 0;
+  const intensitySourceLabel = compatibleProductionRecords.length > 0 ? 'activity output' : 'facility output';
 
   // ESG score calculate
   const esgScoreAverage = calculateAverageScore(esgQuestions);
 
   // Chart 1: Monthly emissions trend mock data (representing FY2025-26)
-  const emissionsTrendData = [
-    { name: 'Q1 Apr-Jun', Scope1: totalScope1 * 0.22, Scope2: totalScope2 * 0.24, Total: (totalScope1 * 0.22 + totalScope2 * 0.24) },
-    { name: 'Q2 Jul-Sep', Scope1: totalScope1 * 0.26, Scope2: totalScope2 * 0.25, Total: (totalScope1 * 0.26 + totalScope2 * 0.25) },
-    { name: 'Q3 Oct-Dec', Scope1: totalScope1 * 0.28, Scope2: totalScope2 * 0.28, Total: (totalScope1 * 0.28 + totalScope2 * 0.28) },
-    { name: 'Q4 Jan-Mar', Scope1: totalScope1 * 0.24, Scope2: totalScope2 * 0.23, Total: (totalScope1 * 0.24 + totalScope2 * 0.23) },
-  ];
+  const monthlyTotals = records.reduce<Record<string, { name: string; Scope1: number; Scope2: number; Total: number }>>((acc, record) => {
+    const month = record.date?.slice(0, 7) || record.reportingPeriod || 'Unassigned';
+    if (!acc[month]) acc[month] = { name: month, Scope1: 0, Scope2: 0, Total: 0 };
+    const emissions = recordEmission(record);
+    if (record.scope === 'scope-1') acc[month].Scope1 += emissions;
+    if (record.scope === 'scope-2') acc[month].Scope2 += emissions;
+    acc[month].Total += emissions;
+    return acc;
+  }, {});
+  const emissionsTrendData = hasActivityRecords
+    ? Object.values(monthlyTotals).sort((a, b) => a.name.localeCompare(b.name))
+    : [
+        { name: 'Q1 Apr-Jun', Scope1: totalScope1 * 0.22, Scope2: totalScope2 * 0.24, Total: (totalScope1 * 0.22 + totalScope2 * 0.24) },
+        { name: 'Q2 Jul-Sep', Scope1: totalScope1 * 0.26, Scope2: totalScope2 * 0.25, Total: (totalScope1 * 0.26 + totalScope2 * 0.25) },
+        { name: 'Q3 Oct-Dec', Scope1: totalScope1 * 0.28, Scope2: totalScope2 * 0.28, Total: (totalScope1 * 0.28 + totalScope2 * 0.28) },
+        { name: 'Q4 Jan-Mar', Scope1: totalScope1 * 0.24, Scope2: totalScope2 * 0.23, Total: (totalScope1 * 0.24 + totalScope2 * 0.23) },
+      ];
 
   // Chart 2: Scope distribution data
   const scopeDistributionData = [
@@ -75,21 +106,40 @@ export default function DashboardOverview({
   const SCOPE_COLORS = ['#3F7D58', '#1F5A3D', '#252A27'];
 
   // Chart 3: Energy source breakdown
-  const energyMixData = [
-    { name: 'Grid Electricity', value: totalElectricity - totalRenewable },
-    { name: 'On-site Solar', value: totalRenewable },
-    { name: 'Diesel Fuel', value: facilities.reduce((sum, f) => sum + (f.fuelType === 'Diesel' ? f.fuelConsumption : 0), 0) },
-  ];
+  const sourceTotals = records.reduce<Record<string, number>>((acc, record) => {
+    const source = record.sourceType || record.energyType || 'Unknown';
+    acc[source] = (acc[source] ?? 0) + recordEmission(record);
+    return acc;
+  }, {});
+  const energyMixData = hasActivityRecords
+    ? Object.entries(sourceTotals).map(([name, value]) => ({ name, value }))
+    : [
+        { name: 'Grid Electricity', value: totalElectricity - totalRenewable },
+        { name: 'On-site Solar', value: totalRenewable },
+        { name: 'Diesel Fuel', value: facilities.reduce((sum, f) => sum + (f.fuelType === 'Diesel' ? f.fuelConsumption : 0), 0) },
+      ];
 
   const ENERGY_COLORS = ['#C88A32', '#1F5A3D', '#B84A4A'];
 
   // Chart 4: Facility comparison emissions
-  const facilityComparisonData = facilities.map(f => ({
-    name: f.name.replace(' Manufacturing Plant', '').replace(' Component Facility', '').replace(' Assembly Unit', ''),
-    Scope1: f.emissionsScope1,
-    Scope2: f.emissionsScope2,
-    Total: f.emissionsScope1 + f.emissionsScope2
-  }));
+  const facilityComparisonData = facilities.map(f => {
+    const facilityRecords = records.filter((record) => record.facilityId === f.id);
+    const scope1 = hasActivityRecords
+      ? facilityRecords.filter((record) => record.scope === 'scope-1').reduce((sum, record) => sum + recordEmission(record), 0)
+      : f.emissionsScope1;
+    const scope2 = hasActivityRecords
+      ? facilityRecords.filter((record) => record.scope === 'scope-2').reduce((sum, record) => sum + recordEmission(record), 0)
+      : f.emissionsScope2;
+    return {
+      name: f.name.replace(' Manufacturing Plant', '').replace(' Component Facility', '').replace(' Assembly Unit', ''),
+      Scope1: scope1,
+      Scope2: scope2,
+      Total: scope1 + scope2
+    };
+  });
+
+  const highestFacility = [...facilityComparisonData].sort((a, b) => b.Total - a.Total)[0];
+  const highestSource = Object.entries(sourceTotals).sort((a, b) => b[1] - a[1])[0];
 
   return (
     <div className="space-y-6">
@@ -124,7 +174,7 @@ export default function DashboardOverview({
             </p>
           </div>
 
-          <div className="grid grid-cols-3 lg:col-span-2 gap-3 text-xs">
+          <div className="grid grid-cols-2 lg:grid-cols-4 lg:col-span-2 gap-3 text-xs">
             <div className="bg-white/8 border border-white/10 rounded-xl p-4">
               <span className="text-[9px] font-mono uppercase text-gray-400 block">Renewable Mix</span>
               <strong className="text-xl font-mono text-brand-sage">{renewableRatio.toFixed(1)}%</strong>
@@ -132,11 +182,16 @@ export default function DashboardOverview({
             <div className="bg-white/8 border border-white/10 rounded-xl p-4">
               <span className="text-[9px] font-mono uppercase text-gray-400 block">Carbon Intensity</span>
               <strong className="text-xl font-mono text-brand-sage">{(averageIntensity * 1000).toFixed(1)}</strong>
-              <span className="block text-[9px] text-gray-400">kg/t output</span>
+              <span className="block text-[9px] text-gray-400">kg/t {intensitySourceLabel}</span>
             </div>
             <div className="bg-white/8 border border-white/10 rounded-xl p-4">
               <span className="text-[9px] font-mono uppercase text-gray-400 block">Evidence Files</span>
               <strong className="text-xl font-mono text-brand-sage">{documents.length}</strong>
+            </div>
+            <div className="bg-white/8 border border-white/10 rounded-xl p-4">
+              <span className="text-[9px] font-mono uppercase text-gray-400 block">Top Emitter</span>
+              <strong className="text-sm font-mono text-brand-sage block truncate">{highestFacility?.name || highestSource?.[0] || 'No records'}</strong>
+              <span className="block text-[9px] text-gray-400 truncate">{highestSource ? `${highestSource[0]} source` : 'facility view'}</span>
             </div>
           </div>
         </div>

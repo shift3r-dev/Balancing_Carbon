@@ -15,9 +15,21 @@ export interface Facility {
 }
 export interface EnergyRecord {
   id: string; organisationId: string; facilityId: string; date: string; reportingPeriod: string;
-  energyType: 'Grid Electricity' | 'Renewable Electricity' | 'Diesel' | 'Petrol' | 'LPG' | 'Natural Gas' | 'Furnace Oil' | 'Biomass';
-  quantity: number; unit: string; sourceDocument: string; notes: string; emissions: number;
-  auditTrail: { emissionFactor: number; factorUnit: string; factorSource: string; methodology: string; calculatedAt: string; };
+  activityType: 'electricity' | 'fuel' | 'renewable-electricity' | 'steam' | 'heat' | 'other';
+  sourceType: string;
+  energyType: string;
+  quantity: number; unit: string; scope: 'scope-1' | 'scope-2';
+  emissionFactorId: string; emissionFactorValue: number; emissionFactorUnit: string;
+  emissionsKgCO2e: number; emissionsTCO2e: number;
+  sourceDocument: string; notes: string; emissions: number;
+  auditTrail: {
+    emissionFactor?: number; emissionFactorId?: string; factorUnit?: string; factorSource?: string;
+    methodology?: string; calculatedAt?: string; factorVersion?: string; emissionsKgCO2e?: number; emissionsTCO2e?: number;
+  };
+}
+export interface ProductionRecord {
+  id: string; organisationId: string; facilityId: string; date: string; reportingPeriod: string;
+  quantity: number; unit: string; sourceDocument: string; notes: string;
 }
 export interface ESGQuestion {
   id: string; category: 'Environmental' | 'Social' | 'Governance' | 'Energy' | 'Carbon' | 'Compliance' | 'Supplier Readiness';

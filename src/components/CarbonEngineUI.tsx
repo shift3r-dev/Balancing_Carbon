@@ -3,25 +3,32 @@ import {
   Calculator, ShieldAlert, BookOpen, AlertCircle, FileText, 
   Settings, CheckCircle, HelpCircle, ChevronRight, Scale 
 } from 'lucide-react';
-import { Facility } from '../types.ts';
+import { EnergyRecord, Facility } from '../types.ts';
 
 interface CarbonEngineProps {
   scopeType: 'scope-1' | 'scope-2' | 'scope-3';
   facilities: Facility[];
+  records?: EnergyRecord[];
 }
 
-export default function CarbonEngineUI({ scopeType, facilities }: CarbonEngineProps) {
+export default function CarbonEngineUI({ scopeType, facilities, records = [] }: CarbonEngineProps) {
   const [simQty, setSimQty] = useState('');
   const [simType, setSimType] = useState('Diesel');
   
   const factors = {
-    'Diesel': { factor: 2.68, unit: 'kgCO2e/Litre', source: 'IPCC 2006 Stationary Combustion Tables', scope: 'Scope 1', desc: 'Direct emissions from plant diesel generators and backup power units.' },
-    'Petrol': { factor: 2.31, unit: 'kgCO2e/Litre', source: 'IPCC 2006 Mobile Combustion Tables', scope: 'Scope 1', desc: 'Emissions from fleet logistics, company cars, and mobile equipment.' },
-    'LPG': { factor: 2.98, unit: 'kgCO2e/kg', source: 'IPCC 2006 Industrial Combustion', scope: 'Scope 1', desc: 'Emissions from factory canteen kitchens and direct heat treatments.' },
-    'Natural Gas': { factor: 2.02, unit: 'kgCO2e/m3', source: 'IPCC 2006 Gaseous Fuel Tables', scope: 'Scope 1', desc: 'Emissions from natural gas pipelines feeding thermal treatment facilities.' },
-    'Furnace Oil': { factor: 3.15, unit: 'kgCO2e/Litre', source: 'IPCC 2006 Boiler Combustions', scope: 'Scope 1', desc: 'Emissions from heavy industrial steam boilers.' },
-    'Grid Electricity': { factor: 0.82, unit: 'kgCO2e/kWh', source: 'Central Electricity Authority (CEA) of India, Grid Version 19', scope: 'Scope 2', desc: 'Indirect emissions derived from electrical power imported from local state electricity boards (MSEDCL, PSPCL, TANGEDCO).' },
-    'Renewable Electricity': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'GHG Protocol Scope 2 Guidance', scope: 'Scope 2', desc: 'Zero-emissions tier for power generated via rooftop solar grids or off-site wind power PPAs.' },
+    'Diesel': { factor: 2.68, unit: 'kgCO2e/litre', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Direct emissions from plant diesel generators and backup power units.' },
+    'Petrol': { factor: 2.31, unit: 'kgCO2e/litre', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Emissions from fleet logistics, company cars, and mobile equipment.' },
+    'LPG': { factor: 1.51, unit: 'kgCO2e/litre', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Emissions from LPG-consuming equipment tracked as litres in this prototype registry.' },
+    'Natural Gas': { factor: 2.02, unit: 'kgCO2e/SCM', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Emissions from natural gas pipelines feeding thermal treatment facilities.' },
+    'Furnace Oil': { factor: 3.15, unit: 'kgCO2e/litre', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Emissions from heavy industrial steam boilers.' },
+    'Biomass': { factor: 0.05, unit: 'kgCO2e/kg', source: 'Prototype biogenic component - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Prototype biomass combustion component for direct plant fuel tracking.' },
+    'Coal': { factor: 2.42, unit: 'kgCO2e/kg', source: 'Prototype factor - replace with authoritative source before audit use', scope: 'Scope 1', desc: 'Direct emissions from coal combustion where still present in process heat operations.' },
+    'Other Fuel': { factor: 1.0, unit: 'kgCO2e/unit', source: 'Placeholder factor - replace before real reporting', scope: 'Scope 1', desc: 'Fallback architecture support for custom direct fuels until a verified factor is entered.' },
+    'Grid Electricity': { factor: 0.716, unit: 'kgCO2e/kWh', source: 'Prototype grid factor - replace with authoritative source before audit use', scope: 'Scope 2', desc: 'Location-based Scope 2 emissions for grid electricity consumption.' },
+    'Solar Electricity': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for on-site solar generation; certificates and residual mix are not modeled.' },
+    'Wind Electricity': { factor: 0.0, unit: 'kgCO2e/kWh', source: 'Prototype renewable operational factor - not market-based accounting', scope: 'Scope 2', desc: 'Zero direct operational emissions for wind electricity; certificates and residual mix are not modeled.' },
+    'Purchased Steam': { factor: 0.184, unit: 'kgCO2e/kg', source: 'Prototype supplier-energy factor - replace with supplier-specific source', scope: 'Scope 2', desc: 'Indirect emissions from purchased steam supplied by an external provider.' },
+    'Purchased Heat': { factor: 0.184, unit: 'kgCO2e/kWh', source: 'Prototype supplier-energy factor - replace with supplier-specific source', scope: 'Scope 2', desc: 'Indirect emissions from purchased heat supplied by an external provider.' },
     'Steel Raw Ingestion': { factor: 1.85, unit: 'kgCO2e/kg', source: 'DEFRA v2025 Material Purchasing', scope: 'Scope 3', desc: 'Upstream embedded carbon of structural steel sheets purchased from primary furnaces.' },
     'Inbound Air Logistics': { factor: 0.61, unit: 'kgCO2e/tonne-km', source: 'DEFRA v2025 Transport & Supply Chain', scope: 'Scope 3', desc: 'Embedded logistical emissions of components shipped via standard air cargo.' }
   };
@@ -55,8 +62,14 @@ export default function CarbonEngineUI({ scopeType, facilities }: CarbonEnginePr
   const simulationResult = handleSimulate();
 
   // Scope specific metrics
-  const scope1Emissions = facilities.reduce((sum, f) => sum + f.emissionsScope1, 0);
-  const scope2Emissions = facilities.reduce((sum, f) => sum + f.emissionsScope2, 0);
+  const recordEmission = (record: EnergyRecord) => Number(record.emissionsTCO2e ?? record.emissions ?? 0);
+  const hasActivityRecords = records.length > 0;
+  const scope1Emissions = hasActivityRecords
+    ? records.filter((record) => record.scope === 'scope-1').reduce((sum, record) => sum + recordEmission(record), 0)
+    : facilities.reduce((sum, f) => sum + f.emissionsScope1, 0);
+  const scope2Emissions = hasActivityRecords
+    ? records.filter((record) => record.scope === 'scope-2').reduce((sum, record) => sum + recordEmission(record), 0)
+    : facilities.reduce((sum, f) => sum + f.emissionsScope2, 0);
 
   return (
     <div className="space-y-6">
@@ -98,7 +111,7 @@ export default function CarbonEngineUI({ scopeType, facilities }: CarbonEnginePr
           <div className="space-y-1">
             <strong className="text-brand-charcoal font-semibold block uppercase font-mono text-[10px]">Deterministic Calculation Assurance</strong>
             <p className="text-gray-500 leading-relaxed text-[11px]">
-              Balancing Carbon's calculations are built around a zero-deviation deterministic logic tree. Activity values are verified for dimension constraints, multiplied by CEA/IPCC factors, and logged in an immutable tenant log file. This audit trail prevents calculation drift and ensures ready export for statutory CSRD reporting.
+              Balancing Carbon's calculations are built around a deterministic activity-record logic tree. Activity values are validated for unit compatibility, multiplied by the resolved factor, and stored with the factor ID/version used. Current seeded factors are prototype-only until replaced with authoritative sources.
             </p>
           </div>
         </div>

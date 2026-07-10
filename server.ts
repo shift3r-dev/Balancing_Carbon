@@ -1,7 +1,18 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
+import 'dotenv/config';
 import cors from 'cors';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { createClient, type User } from '@supabase/supabase-js';
+import {
+  aggregateFacilityActivities,
+  calculateActivityEmissions,
+  deriveActivityType,
+  normalizeUnit,
+  prototypeEmissionFactors,
+  resolveEmissionFactor,
+  type ActivityScope,
+} from './server/carbonAccounting.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -52,13 +63,21 @@ const mapEnergyRecord = (r: any) => ({
   facilityId: r.facility_id,
   date: r.date,
   reportingPeriod: r.reporting_period ?? '',
-  energyType: r.energy_type,
+  activityType: r.activity_type ?? deriveActivityType(r.source_type ?? r.energy_type ?? ''),
+  sourceType: r.source_type ?? r.energy_type,
+  energyType: r.energy_type ?? r.source_type,
   quantity: Number(r.quantity ?? 0),
   unit: r.unit ?? '',
+  scope: r.scope ?? (resolveEmissionFactor(r.source_type ?? r.energy_type ?? '')?.scope ?? 'scope-1'),
+  emissionFactorId: r.emission_factor_id ?? r.audit_trail?.emissionFactorId ?? '',
+  emissionFactorValue: Number(r.emission_factor_value ?? r.audit_trail?.emissionFactor ?? 0),
+  emissionFactorUnit: r.emission_factor_unit ?? r.audit_trail?.factorUnit ?? '',
+  emissionsKgCO2e: Number(r.emissions_kg_co2e ?? (Number(r.emissions ?? 0) * 1000)),
+  emissionsTCO2e: Number(r.emissions_t_co2e ?? r.emissions ?? 0),
   sourceDocument: r.source_document ?? '',
   notes: r.notes ?? '',
-  emissions: Number(r.emissions ?? 0),
-  auditTrail: r.audit_trail ?? {},
+  emissions: Number(r.emissions_t_co2e ?? r.emissions ?? 0),
+  auditTrail: r.calculation_metadata ?? r.audit_trail ?? {},
 });
 
 const mapESGQuestion = (q: any) => ({
@@ -109,6 +128,18 @@ const mapReport = (r: any) => ({
   downloadUrl: r.download_url ?? '#',
 });
 
+const mapProductionRecord = (r: any) => ({
+  id: r.id,
+  organisationId: r.organisation_id,
+  facilityId: r.facility_id,
+  date: r.date,
+  reportingPeriod: r.reporting_period ?? '',
+  quantity: Number(r.quantity ?? 0),
+  unit: r.unit ?? '',
+  sourceDocument: r.source_document ?? '',
+  notes: r.notes ?? '',
+});
+
 function bearer(req: Request) {
   const h = req.headers.authorization;
   return h?.toLowerCase().startsWith('bearer ') ? h.slice(7).trim() : null;
@@ -132,16 +163,11 @@ const num = (a: unknown, b?: unknown) => {
   const raw = a ?? b ?? 0; const n = Number(raw); return Number.isFinite(n) ? n : 0;
 };
 
-const FUEL_EMISSION_FACTORS: Record<string, number> = {
-  Diesel: 2.68,
-  Petrol: 2.31,
-  LPG: 2.98,
-  'Natural Gas': 2.02,
-  'Furnace Oil': 3.15,
-  Biomass: 0.05,
-};
+const FUEL_EMISSION_FACTORS: Record<string, number> = Object.fromEntries(
+  prototypeEmissionFactors.filter((factor) => factor.scope === 'scope-1').map((factor) => [factor.sourceType, factor.factorValue]),
+);
 
-const GRID_ELECTRICITY_FACTOR = 0.82;
+const GRID_ELECTRICITY_FACTOR = resolveEmissionFactor('Grid Electricity')?.factorValue ?? 0.716;
 
 function calculateFacilityEmissions(input: {
   productionOutput: number;
@@ -168,32 +194,48 @@ function calculateFacilityEmissions(input: {
   };
 }
 
-function calculateEnergyRecordEmissions(energyType: string, quantity: number) {
-  const factor = energyType === 'Grid Electricity'
-    ? GRID_ELECTRICITY_FACTOR
-    : energyType === 'Renewable Electricity'
-      ? 0
-      : FUEL_EMISSION_FACTORS[energyType] ?? 0;
-  const factorUnit = energyType.includes('Electricity') ? 'kgCO2e/kWh' :
-    energyType === 'LPG' || energyType === 'Biomass' ? 'kgCO2e/kg' :
-      energyType === 'Natural Gas' ? 'kgCO2e/m3' : 'kgCO2e/Litre';
-  const factorSource = energyType.includes('Electricity')
-    ? 'CEA India Grid Emission Factor v19'
-    : 'IPCC 2006 Guidelines';
-  const methodology = energyType.includes('Electricity')
-    ? 'Scope 2 Location-Based Electricity Emissions'
-    : 'Scope 1 Stationary/Mobile Combustion';
+async function refreshFacilityAggregates(organisationId: string, facilityId: string) {
+  const { data: facility, error: facilityError } = await supabaseAdmin
+    .from('facilities')
+    .select('*')
+    .eq('id', facilityId)
+    .eq('organisation_id', organisationId)
+    .single();
+  if (facilityError || !facility) return;
 
-  return {
-    emissions: Number(((quantity * factor) / 1000).toFixed(4)),
-    auditTrail: {
-      emissionFactor: factor,
-      factorUnit,
-      factorSource,
-      methodology,
-      calculatedAt: new Date().toISOString(),
-    },
-  };
+  const { data: records, error: recordsError } = await supabaseAdmin
+    .from('energy_records')
+    .select('*')
+    .eq('organisation_id', organisationId)
+    .eq('facility_id', facilityId);
+  if (recordsError) return;
+
+  const aggregate = aggregateFacilityActivities(
+    (records ?? []).map((record) => ({
+      facilityId: record.facility_id,
+      sourceType: record.source_type ?? record.energy_type,
+      quantity: Number(record.quantity ?? 0),
+      unit: record.unit ?? '',
+      scope: (record.scope ?? resolveEmissionFactor(record.source_type ?? record.energy_type ?? '')?.scope ?? 'scope-1') as ActivityScope,
+      emissionsTCO2e: Number(record.emissions_t_co2e ?? record.emissions ?? 0),
+    })),
+    Number(facility.production_output ?? 0),
+    facility.production_unit ?? '',
+  );
+
+  await supabaseAdmin
+    .from('facilities')
+    .update({
+      electricity_consumption: aggregate.electricityConsumption,
+      renewable_energy_usage: aggregate.renewableEnergyUsage,
+      fuel_consumption: aggregate.fuelConsumption,
+      fuel_type: aggregate.fuelType,
+      emissions_scope_1: aggregate.emissionsScope1,
+      emissions_scope_2: aggregate.emissionsScope2,
+      carbon_intensity: aggregate.carbonIntensity,
+    })
+    .eq('id', facilityId)
+    .eq('organisation_id', organisationId);
 }
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Balancing Carbon API' }));
@@ -412,13 +454,19 @@ app.delete('/api/facilities/:id', requireAuth, async (req: AuthenticatedRequest,
 app.get('/api/energy', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const p = await getProfile(req.authUser!.id);
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('energy_records')
       .select('*')
-      .eq('organisation_id', p.organisation_id)
-      .order('date', { ascending: false });
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ records: (data ?? []).map(mapEnergyRecord) });
+      .eq('organisation_id', p.organisation_id);
+
+    if (typeof req.query.facilityId === 'string') query = query.eq('facility_id', req.query.facilityId);
+    if (typeof req.query.reportingPeriod === 'string') query = query.eq('reporting_period', req.query.reportingPeriod);
+    if (typeof req.query.sourceType === 'string') query = query.eq('source_type', req.query.sourceType);
+    if (typeof req.query.scope === 'string') query = query.eq('scope', req.query.scope);
+
+    const filtered = await query.order('date', { ascending: false });
+    if (filtered.error) return res.status(500).json({ error: filtered.error.message });
+    res.json({ records: (filtered.data ?? []).map(mapEnergyRecord) });
   } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load energy records.' }); }
 });
 
@@ -426,10 +474,10 @@ app.post('/api/energy', requireAuth, async (req: AuthenticatedRequest, res) => {
   try {
     const p = await getProfile(req.authUser!.id), b = req.body ?? {};
     const facilityId = str(b.facilityId, b.facility_id);
-    const energyType = str(b.energyType, b.energy_type);
-    const quantity = num(b.quantity);
-    if (!facilityId || !energyType || quantity <= 0) {
-      return res.status(400).json({ error: 'Facility, energy type, and positive quantity are required.' });
+    const sourceType = str(b.sourceType, b.source_type) || str(b.energyType, b.energy_type);
+    const quantity = Number(b.quantity);
+    if (!facilityId || !sourceType || !Number.isFinite(quantity) || quantity < 0) {
+      return res.status(400).json({ error: 'Facility, source type, and non-negative finite quantity are required.' });
     }
 
     const { data: facility, error: facilityError } = await supabaseAdmin
@@ -440,62 +488,216 @@ app.post('/api/energy', requireAuth, async (req: AuthenticatedRequest, res) => {
       .single();
     if (facilityError || !facility) return res.status(404).json({ error: 'Facility not found.' });
 
-    const calculation = calculateEnergyRecordEmissions(energyType, quantity);
+    const factor = resolveEmissionFactor(sourceType);
+    if (!factor) return res.status(400).json({ error: `No active emission factor found for source type: ${sourceType}.` });
+    const activityType = str(b.activityType, b.activity_type) || deriveActivityType(sourceType);
+    const requestedUnit = str(b.unit) || factor.activityUnit;
+    let calculation;
+    try {
+      calculation = calculateActivityEmissions({
+        quantity,
+        activityUnit: requestedUnit,
+        sourceType,
+        emissionFactor: factor,
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid activity record.' });
+    }
+
+    const calculationMetadata = {
+      methodology: 'activity_data_x_emission_factor',
+      quantity: calculation.quantity,
+      activityUnit: calculation.normalizedUnit,
+      sourceType,
+      scope: factor.scope,
+      emissionFactorId: calculation.emissionFactorId,
+      emissionFactorValue: calculation.emissionFactorValue,
+      emissionFactorUnit: calculation.emissionFactorUnit,
+      emissionsKgCO2e: calculation.emissionsKgCO2e,
+      emissionsTCO2e: calculation.emissionsTCO2e,
+      factorSource: calculation.factorSource,
+      factorVersion: calculation.factorVersion,
+      calculatedAt: calculation.calculatedAt,
+    };
+
     const row = {
       id: `rec-${randomUUID()}`,
       organisation_id: p.organisation_id,
       facility_id: facilityId,
       date: str(b.date) || new Date().toISOString().split('T')[0],
       reporting_period: str(b.reportingPeriod, b.reporting_period) || facility.reporting_period || new Date().getFullYear().toString(),
-      energy_type: energyType,
+      activity_type: activityType,
+      source_type: sourceType,
+      energy_type: sourceType,
       quantity,
-      unit: str(b.unit) || (energyType.includes('Electricity') ? 'kWh' : 'Litres'),
+      unit: calculation.normalizedUnit,
+      scope: factor.scope,
+      emission_factor_id: calculation.emissionFactorId,
+      emission_factor_value: calculation.emissionFactorValue,
+      emission_factor_unit: calculation.emissionFactorUnit,
+      emissions_kg_co2e: calculation.emissionsKgCO2e,
+      emissions_t_co2e: calculation.emissionsTCO2e,
       source_document: str(b.sourceDocument, b.source_document) || 'Manual Entry',
       notes: str(b.notes),
-      emissions: calculation.emissions,
-      audit_trail: calculation.auditTrail,
+      emissions: calculation.emissionsTCO2e,
+      audit_trail: calculationMetadata,
+      calculation_metadata: calculationMetadata,
     };
 
     const { data, error } = await supabaseAdmin.from('energy_records').insert(row).select('*').single();
     if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create energy record.' });
 
-    const { data: records, error: recordsError } = await supabaseAdmin
-      .from('energy_records')
-      .select('*')
-      .eq('organisation_id', p.organisation_id)
-      .eq('facility_id', facilityId);
-    if (!recordsError) {
-      let electricity = 0, renewable = 0, scope1 = 0, scope2 = 0;
-      for (const record of records ?? []) {
-        const qty = Number(record.quantity ?? 0);
-        const emissions = Number(record.emissions ?? 0);
-        if (record.energy_type === 'Grid Electricity') {
-          electricity += qty;
-          scope2 += emissions;
-        } else if (record.energy_type === 'Renewable Electricity') {
-          electricity += qty;
-          renewable += qty;
-        } else {
-          scope1 += emissions;
-        }
-      }
-      const productionOutput = Number(facility.production_output ?? 0);
-      const carbonIntensity = productionOutput > 0 ? (scope1 + scope2) / productionOutput : 0;
-      await supabaseAdmin
-        .from('facilities')
-        .update({
-          electricity_consumption: Number(electricity.toFixed(4)),
-          renewable_energy_usage: Number(renewable.toFixed(4)),
-          emissions_scope_1: Number(scope1.toFixed(4)),
-          emissions_scope_2: Number(scope2.toFixed(4)),
-          carbon_intensity: Number(carbonIntensity.toFixed(5)),
-        })
-        .eq('id', facilityId)
-        .eq('organisation_id', p.organisation_id);
-    }
+    await refreshFacilityAggregates(p.organisation_id, facilityId);
 
     res.status(201).json({ success: true, record: mapEnergyRecord(data) });
   } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create energy record.' }); }
+});
+
+app.patch('/api/energy/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const p = await getProfile(req.authUser!.id), b = req.body ?? {};
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('energy_records')
+      .select('*')
+      .eq('id', req.params.id)
+      .eq('organisation_id', p.organisation_id)
+      .single();
+    if (existingError || !existing) return res.status(404).json({ error: 'Energy record not found.' });
+
+    const sourceType = str(b.sourceType, b.source_type) || str(b.energyType, b.energy_type) || existing.source_type || existing.energy_type;
+    const quantity = b.quantity !== undefined ? Number(b.quantity) : Number(existing.quantity ?? 0);
+    const factor = resolveEmissionFactor(sourceType);
+    if (!factor) return res.status(400).json({ error: `No active emission factor found for source type: ${sourceType}.` });
+    const requestedUnit = str(b.unit) || existing.unit || factor.activityUnit;
+    let calculation;
+    try {
+      calculation = calculateActivityEmissions({ quantity, activityUnit: requestedUnit, sourceType, emissionFactor: factor });
+    } catch (error) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid activity record.' });
+    }
+
+    const calculationMetadata = {
+      methodology: 'activity_data_x_emission_factor',
+      quantity: calculation.quantity,
+      activityUnit: calculation.normalizedUnit,
+      sourceType,
+      scope: factor.scope,
+      emissionFactorId: calculation.emissionFactorId,
+      emissionFactorValue: calculation.emissionFactorValue,
+      emissionFactorUnit: calculation.emissionFactorUnit,
+      emissionsKgCO2e: calculation.emissionsKgCO2e,
+      emissionsTCO2e: calculation.emissionsTCO2e,
+      factorSource: calculation.factorSource,
+      factorVersion: calculation.factorVersion,
+      calculatedAt: calculation.calculatedAt,
+    };
+
+    const updates = {
+      date: str(b.date) || existing.date,
+      reporting_period: str(b.reportingPeriod, b.reporting_period) || existing.reporting_period,
+      activity_type: str(b.activityType, b.activity_type) || deriveActivityType(sourceType),
+      source_type: sourceType,
+      energy_type: sourceType,
+      quantity,
+      unit: calculation.normalizedUnit,
+      scope: factor.scope,
+      emission_factor_id: calculation.emissionFactorId,
+      emission_factor_value: calculation.emissionFactorValue,
+      emission_factor_unit: calculation.emissionFactorUnit,
+      emissions_kg_co2e: calculation.emissionsKgCO2e,
+      emissions_t_co2e: calculation.emissionsTCO2e,
+      source_document: str(b.sourceDocument, b.source_document) || existing.source_document,
+      notes: b.notes !== undefined ? str(b.notes) : existing.notes,
+      emissions: calculation.emissionsTCO2e,
+      audit_trail: calculationMetadata,
+      calculation_metadata: calculationMetadata,
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('energy_records')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('organisation_id', p.organisation_id)
+      .select('*')
+      .single();
+    if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to update energy record.' });
+    await refreshFacilityAggregates(p.organisation_id, existing.facility_id);
+    res.json({ success: true, record: mapEnergyRecord(data) });
+  } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to update energy record.' }); }
+});
+
+app.delete('/api/energy/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const p = await getProfile(req.authUser!.id);
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('energy_records')
+      .select('id, facility_id')
+      .eq('id', req.params.id)
+      .eq('organisation_id', p.organisation_id)
+      .single();
+    if (existingError || !existing) return res.status(404).json({ error: 'Energy record not found.' });
+    const { error } = await supabaseAdmin
+      .from('energy_records')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('organisation_id', p.organisation_id);
+    if (error) return res.status(500).json({ error: error.message });
+    await refreshFacilityAggregates(p.organisation_id, existing.facility_id);
+    res.json({ success: true, deletedRecordId: req.params.id });
+  } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to delete energy record.' }); }
+});
+
+app.get('/api/emission-factors', requireAuth, (_req, res) => {
+  res.json({ factors: prototypeEmissionFactors });
+});
+
+app.get('/api/production', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const p = await getProfile(req.authUser!.id);
+    let query = supabaseAdmin
+      .from('production_records')
+      .select('*')
+      .eq('organisation_id', p.organisation_id);
+    if (typeof req.query.facilityId === 'string') query = query.eq('facility_id', req.query.facilityId);
+    if (typeof req.query.reportingPeriod === 'string') query = query.eq('reporting_period', req.query.reportingPeriod);
+    const { data, error } = await query.order('date', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ records: (data ?? []).map(mapProductionRecord) });
+  } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load production records.' }); }
+});
+
+app.post('/api/production', requireAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const p = await getProfile(req.authUser!.id), b = req.body ?? {};
+    const facilityId = str(b.facilityId, b.facility_id);
+    const quantity = Number(b.quantity);
+    const unit = str(b.unit);
+    if (!facilityId || !Number.isFinite(quantity) || quantity < 0 || !unit) {
+      return res.status(400).json({ error: 'Facility, non-negative finite quantity, and production unit are required.' });
+    }
+    const { data: facility, error: facilityError } = await supabaseAdmin
+      .from('facilities')
+      .select('id')
+      .eq('id', facilityId)
+      .eq('organisation_id', p.organisation_id)
+      .single();
+    if (facilityError || !facility) return res.status(404).json({ error: 'Facility not found.' });
+
+    const row = {
+      id: `prod-${randomUUID()}`,
+      organisation_id: p.organisation_id,
+      facility_id: facilityId,
+      date: str(b.date) || new Date().toISOString().split('T')[0],
+      reporting_period: str(b.reportingPeriod, b.reporting_period) || 'FY 2025-26',
+      quantity,
+      unit,
+      source_document: str(b.sourceDocument, b.source_document),
+      notes: str(b.notes),
+    };
+    const { data, error } = await supabaseAdmin.from('production_records').insert(row).select('*').single();
+    if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create production record.' });
+    res.status(201).json({ success: true, record: mapProductionRecord(data) });
+  } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create production record.' }); }
 });
 
 app.get('/api/esg', requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -701,11 +903,35 @@ app.post('/api/reports', requireAuth, async (req: AuthenticatedRequest, res) => 
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
-app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error(error); res.status(500).json({ error: 'Internal server error.' });
-});
 
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+async function configureFrontend() {
+  if (process.env.NODE_ENV === 'production') {
+    const distPath = path.resolve(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    return;
+  }
+
+  const { createServer: createViteServer } = await import('vite');
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'spa',
+  });
+  app.use(vite.middlewares);
+}
+
+async function startLocalServer() {
+  await configureFrontend();
+  app.use((error: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(error); res.status(500).json({ error: 'Internal server error.' });
+  });
   app.listen(Number(process.env.PORT || 3000), () => console.log('Balancing Carbon API running.'));
+}
+
+if (!process.env.VERCEL) {
+  startLocalServer().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 }
 export default app;

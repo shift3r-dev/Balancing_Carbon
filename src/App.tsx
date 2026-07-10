@@ -43,6 +43,7 @@ import AIAssistantModule from "./components/AIAssistantModule.tsx";
 import {
   Facility,
   EnergyRecord,
+  ProductionRecord,
   ESGQuestion,
   OEMQuestionnaire,
   Document,
@@ -84,6 +85,7 @@ export default function App() {
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [records, setRecords] = useState<EnergyRecord[]>([]);
+  const [productionRecords, setProductionRecords] = useState<ProductionRecord[]>([]);
   const [esgQuestions, setEsgQuestions] = useState<ESGQuestion[]>([]);
   const [oemSurveys, setOemSurveys] = useState<OEMQuestionnaire[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -110,6 +112,7 @@ export default function App() {
           "/api/organisation",
           "/api/facilities",
           "/api/energy",
+          "/api/production",
           "/api/esg",
           "/api/oem-surveys",
           "/api/documents",
@@ -149,10 +152,11 @@ export default function App() {
         const orgData = await safeJson(responses[0], null);
         const facData = await safeJson(responses[1], []);
         const energyData = await safeJson(responses[2], []);
-        const esgData = await safeJson(responses[3], []);
-        const oemData = await safeJson(responses[4], []);
-        const docData = await safeJson(responses[5], []);
-        const repData = await safeJson(responses[6], []);
+        const productionData = await safeJson(responses[3], []);
+        const esgData = await safeJson(responses[4], []);
+        const oemData = await safeJson(responses[5], []);
+        const docData = await safeJson(responses[6], []);
+        const repData = await safeJson(responses[7], []);
 
         setOrganisation(orgData);
         setFacilities(
@@ -160,6 +164,11 @@ export default function App() {
         );
         setRecords(
           Array.isArray(energyData) ? energyData : (energyData?.records ?? []),
+        );
+        setProductionRecords(
+          Array.isArray(productionData)
+            ? productionData
+            : (productionData?.records ?? []),
         );
         setEsgQuestions(
           Array.isArray(esgData) ? esgData : (esgData?.questions ?? []),
@@ -314,6 +323,55 @@ export default function App() {
       );
       setRecords(
         Array.isArray(energyData) ? energyData : (energyData?.records ?? []),
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    try {
+      const deleted = await safeFetchJson(
+        `/api/energy/${id}`,
+        { method: "DELETE" },
+        { success: true },
+      );
+      if (!deleted) return;
+      setRecords((prev) => prev.filter((record) => record.id !== id));
+
+      const facData = await safeFetchJson("/api/facilities", undefined, []);
+      const energyData = await safeFetchJson("/api/energy", undefined, []);
+      setFacilities(
+        Array.isArray(facData) ? facData : (facData?.facilities ?? []),
+      );
+      setRecords(
+        Array.isArray(energyData) ? energyData : (energyData?.records ?? []),
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddProduction = async (payload: any) => {
+    try {
+      const newProduction = await safeFetchJson("/api/production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const createdProduction = unwrapEntity<ProductionRecord>(newProduction, [
+        "record",
+        "productionRecord",
+      ]);
+      if (createdProduction?.id) {
+        setProductionRecords((prev) => [createdProduction, ...prev]);
+      }
+
+      const productionData = await safeFetchJson("/api/production", undefined, []);
+      setProductionRecords(
+        Array.isArray(productionData)
+          ? productionData
+          : (productionData?.records ?? []),
       );
     } catch (err) {
       console.error(err);
@@ -540,6 +598,7 @@ export default function App() {
     setOrganisation(null);
     setFacilities([]);
     setRecords([]);
+    setProductionRecords([]);
     setEsgQuestions([]);
     setOemSurveys([]);
     setDocuments([]);
@@ -931,6 +990,7 @@ export default function App() {
                   <DashboardOverview
                     facilities={facilities}
                     records={records}
+                    productionRecords={productionRecords}
                     esgQuestions={esgQuestions}
                     oemSurveys={oemSurveys}
                     documents={documents}
@@ -948,20 +1008,35 @@ export default function App() {
                 {currentView === "dashboard-energy" && (
                   <EnergyTracking
                     records={records}
+                    productionRecords={productionRecords}
                     facilities={facilities}
                     onAddRecord={handleAddRecord}
+                    onAddProduction={handleAddProduction}
+                    onDeleteRecord={handleDeleteRecord}
                   />
                 )}
 
                 {/* Carbon engine explorer views */}
                 {currentView === "dashboard-emissions-scope1" && (
-                  <CarbonEngineUI scopeType="scope-1" facilities={facilities} />
+                  <CarbonEngineUI
+                    scopeType="scope-1"
+                    facilities={facilities}
+                    records={records}
+                  />
                 )}
                 {currentView === "dashboard-emissions-scope2" && (
-                  <CarbonEngineUI scopeType="scope-2" facilities={facilities} />
+                  <CarbonEngineUI
+                    scopeType="scope-2"
+                    facilities={facilities}
+                    records={records}
+                  />
                 )}
                 {currentView === "dashboard-emissions-scope3" && (
-                  <CarbonEngineUI scopeType="scope-3" facilities={facilities} />
+                  <CarbonEngineUI
+                    scopeType="scope-3"
+                    facilities={facilities}
+                    records={records}
+                  />
                 )}
 
                 {/* ESG & Surveys */}
@@ -1628,6 +1703,7 @@ export default function App() {
                 <CarbonEngineUI
                   scopeType={homeScopeType}
                   facilities={facilities}
+                  records={records}
                 />
               </div>
             </div>
