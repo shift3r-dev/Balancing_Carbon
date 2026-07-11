@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Upload, FileSpreadsheet, Calendar, Filter, Trash2, Factory, Pencil } from 'lucide-react';
 import { EnergyRecord, Facility, ProductionRecord } from '../types.ts';
+import { safeFetchJson } from '../services/apiClient.ts';
 
 interface EnergyProps {
   records: EnergyRecord[];
@@ -12,20 +13,8 @@ interface EnergyProps {
   onDeleteRecord?: (id: string) => void;
 }
 
-const SOURCE_OPTIONS = [
-  { sourceType: 'Grid Electricity', activityType: 'electricity', unit: 'kWh', scope: 'scope-2' },
-  { sourceType: 'On-site Solar', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2' },
-  { sourceType: 'On-site Wind', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2' },
-  { sourceType: 'Diesel', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
-  { sourceType: 'Petrol', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
-  { sourceType: 'LPG', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
-  { sourceType: 'Natural Gas', activityType: 'fuel', unit: 'SCM', scope: 'scope-1' },
-  { sourceType: 'Furnace Oil', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
-  { sourceType: 'Biomass', activityType: 'fuel', unit: 'kg', scope: 'scope-1' },
-  { sourceType: 'Coal', activityType: 'fuel', unit: 'kg', scope: 'scope-1' },
-  { sourceType: 'Purchased Steam', activityType: 'steam', unit: 'kg', scope: 'scope-2' },
-  { sourceType: 'Purchased Heat', activityType: 'heat', unit: 'kWh', scope: 'scope-2' },
-] as const;
+type SourceOption = { sourceType: string; scope: 'scope-1' | 'scope-2'; unit: string };
+type UnitOption = { id: string; code: string; name: string; symbol: string };
 
 export default function EnergyTracking({
   records,
@@ -41,10 +30,11 @@ export default function EnergyTracking({
   const [facilityId, setFacilityId] = useState(facilities[0]?.id || '');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportingPeriod, setReportingPeriod] = useState('FY 2025-26');
-  const [activityType, setActivityType] = useState('electricity');
-  const [sourceType, setSourceType] = useState('Grid Electricity');
+  const [sourceOptions, setSourceOptions] = useState<SourceOption[]>([]);
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
+  const [sourceType, setSourceType] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('kWh');
+  const [unit, setUnit] = useState('');
   const [sourceDocument, setSourceDocument] = useState('');
   const [notes, setNotes] = useState('');
   const [productionFacilityId, setProductionFacilityId] = useState(facilities[0]?.id || '');
@@ -61,12 +51,28 @@ export default function EnergyTracking({
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
-  const selectedSource = SOURCE_OPTIONS.find((option) => option.sourceType === sourceType) ?? SOURCE_OPTIONS[0];
+  const selectedSource = sourceOptions.find((option) => option.sourceType === sourceType) ?? sourceOptions[0] ?? { sourceType: '', scope: 'scope-1' as const, unit: '' };
+
+  useEffect(() => {
+    void safeFetchJson('/api/emission-factors', undefined, { factors: [] }).then((data) => {
+      const next = (data?.factors ?? []).map((factor: any) => ({ sourceType: factor.source_type, scope: factor.scope, unit: factor.activity_unit }));
+      setSourceOptions(next);
+      if (!sourceType && next[0]) { setSourceType(next[0].sourceType); setUnit(next[0].unit); }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!sourceType) return;
+    void safeFetchJson(`/api/units?sourceType=${encodeURIComponent(sourceType)}`, undefined, { units: [] }).then((data) => {
+      const next = data?.units ?? []; setUnitOptions(next);
+      if (next.length && !next.some((item: UnitOption) => item.code === unit)) setUnit(next[0].code);
+    });
+  }, [sourceType]);
 
   const handleSourceChange = (nextSourceType: string) => {
-    const next = SOURCE_OPTIONS.find((option) => option.sourceType === nextSourceType) ?? SOURCE_OPTIONS[0];
+    const next = sourceOptions.find((option) => option.sourceType === nextSourceType) ?? sourceOptions[0];
+    if (!next) return;
     setSourceType(next.sourceType);
-    setActivityType(next.activityType);
     setUnit(next.unit);
   };
 
@@ -80,15 +86,15 @@ export default function EnergyTracking({
 
   const handleEditRecord = (record: EnergyRecord) => {
     const recordSource = record.sourceType || record.energyType;
-    const matched = SOURCE_OPTIONS.find((option) => option.sourceType === recordSource) ?? SOURCE_OPTIONS[0];
+    const matched = sourceOptions.find((option) => option.sourceType === recordSource) ?? sourceOptions[0];
+    if (!matched) return;
     setEditingRecordId(record.id);
     setFacilityId(record.facilityId);
     setDate(record.date);
     setReportingPeriod(record.reportingPeriod);
     setSourceType(matched.sourceType);
-    setActivityType(matched.activityType);
-    setUnit(matched.unit);
-    setQuantity(String(record.quantity ?? ''));
+    setUnit(record.inputUnit || matched.unit);
+    setQuantity(String(record.inputQuantity ?? record.quantity ?? ''));
     setSourceDocument(record.sourceDocument ?? '');
     setNotes(record.notes ?? '');
     setShowAddForm(true);
@@ -105,7 +111,6 @@ export default function EnergyTracking({
       facilityId,
       date,
       reportingPeriod,
-      activityType,
       sourceType,
       energyType: sourceType,
       quantity: Number(quantity),
@@ -207,22 +212,11 @@ export default function EnergyTracking({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block font-mono text-gray-500 mb-1">Activity Category *</label>
-                  <select value={activityType} onChange={(e) => setActivityType(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs font-mono" required>
-                    <option value="electricity">Electricity</option>
-                    <option value="renewable-electricity">Renewable Electricity</option>
-                    <option value="fuel">Fuel</option>
-                    <option value="steam">Steam</option>
-                    <option value="heat">Purchased Heat</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-mono text-gray-500 mb-1">Source Type *</label>
                   <select value={sourceType} onChange={(e) => handleSourceChange(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs font-mono" required>
-                    {SOURCE_OPTIONS.map((option) => (
+                    {sourceOptions.map((option) => (
                       <option key={option.sourceType} value={option.sourceType}>{option.sourceType}</option>
                     ))}
                   </select>
@@ -231,9 +225,9 @@ export default function EnergyTracking({
                   <label className="block font-mono text-gray-500 mb-1">Activity Quantity *</label>
                   <div className="flex">
                     <input type="number" min="0" step="any" required placeholder="e.g. 425000" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full border border-brand-border p-2.5 rounded-l text-xs bg-brand-offwhite font-mono" />
-                    <span className="bg-brand-sage text-brand-forest border-y border-r border-brand-border px-3 rounded-r font-mono font-semibold flex items-center justify-center min-w-16">
-                      {unit}
-                    </span>
+                    <select value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-brand-sage text-brand-forest border-y border-r border-brand-border px-2 rounded-r font-mono font-semibold min-w-24">
+                      {unitOptions.map((option) => <option key={option.id} value={option.code}>{option.symbol || option.code}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -350,7 +344,7 @@ export default function EnergyTracking({
             </select>
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
               <option value="all">All Sources</option>
-              {SOURCE_OPTIONS.map((option) => (
+              {sourceOptions.map((option) => (
                 <option key={option.sourceType} value={option.sourceType}>{option.sourceType}</option>
               ))}
             </select>
@@ -400,7 +394,7 @@ export default function EnergyTracking({
                       </span>
                     </td>
                     <td className="p-3 font-mono text-brand-charcoal whitespace-nowrap">{record.scope === 'scope-2' ? 'Scope 2' : 'Scope 1'}</td>
-                    <td className="p-3 text-right font-mono text-brand-charcoal whitespace-nowrap">{record.quantity.toLocaleString()} {record.unit}</td>
+                    <td className="p-3 text-right font-mono text-brand-charcoal whitespace-nowrap">{Number(record.displayValue ?? record.inputQuantity ?? record.quantity).toLocaleString()} {record.displayUnit ?? record.inputUnit ?? record.unit}</td>
                     <td className="p-3 text-right font-mono font-bold whitespace-nowrap text-brand-charcoal">{displayEmissions.toFixed(3)} tCO2e</td>
                     <td className="p-3 text-gray-400 font-mono italic whitespace-nowrap truncate max-w-44" title={record.sourceDocument}>{record.sourceDocument}</td>
                     <td className="p-3 whitespace-nowrap">

@@ -47,6 +47,7 @@ export async function saveCalculationLineage(input: {
   cost?: number | null; currency?: string; sourceDocument?: string; notes?: string; factor: EmissionFactor;
   calculation: ReturnType<typeof calculateActivityEmissions>; documentIds?: string[]; supersedesActivityId?: string | null;
   versionNumber?: number;
+  inputQuantity?: number; inputUnit?: string; canonicalQuantity?: number; canonicalUnit?: string; conversionFactor?: number; conversionPath?: string[];
 }) {
   const activityId = `activity-${randomUUID()}`;
   const evidenceIds = [...new Set((input.documentIds ?? []).filter(Boolean))];
@@ -55,6 +56,9 @@ export async function saveCalculationLineage(input: {
     id: activityId, legacy_energy_record_id: input.legacyEnergyRecordId, organisation_id: input.organisationId, facility_id: input.facilityId,
     activity_category: activityCategory(input.sourceType), source_type: input.sourceType, scope: input.factor.scope,
     activity_date: input.activityDate, reporting_period: input.reportingPeriod, quantity: input.quantity, unit: input.calculation.normalizedUnit,
+    input_quantity: input.inputQuantity ?? input.quantity, input_unit: input.inputUnit ?? input.unit,
+    canonical_quantity: input.canonicalQuantity ?? input.quantity, canonical_unit: input.canonicalUnit ?? input.calculation.normalizedUnit,
+    conversion_factor: input.conversionFactor ?? 1, conversion_path: input.conversionPath ?? [],
     supplier: input.supplier ?? '', invoice_number: input.invoiceNumber ?? '', cost: input.cost ?? null, currency: input.currency ?? 'INR',
     emission_factor_id: input.factor.id, verification_status: verificationStatus, notes: input.notes ?? '', source_document: input.sourceDocument ?? '',
     supersedes_id: input.supersedesActivityId ?? null, version_number: input.versionNumber ?? 1, created_by: input.userId, updated_by: input.userId,
@@ -73,7 +77,7 @@ export async function saveCalculationLineage(input: {
   const { data: calculationRecord, error: calculationError } = await supabaseAdmin.from('calculation_records').insert({
     id: `calc-${randomUUID()}`, legacy_energy_record_id: input.legacyEnergyRecordId, activity_record_id: activityId, organisation_id: input.organisationId,
     emission_factor_id: input.factor.id, factor_version: input.factor.version, formula: 'activity quantity x emission factor',
-    input_snapshot: { quantity: input.quantity, unit: input.calculation.normalizedUnit, sourceType: input.sourceType, activityDate: input.activityDate },
+    input_snapshot: { quantity: input.quantity, unit: input.calculation.normalizedUnit, sourceType: input.sourceType, activityDate: input.activityDate, inputQuantity: input.inputQuantity ?? input.quantity, inputUnit: input.inputUnit ?? input.unit, canonicalQuantity: input.canonicalQuantity ?? input.quantity, canonicalUnit: input.canonicalUnit ?? input.calculation.normalizedUnit, conversionPath: input.conversionPath ?? [] },
     evidence_snapshot: evidenceSnapshot,
     emissions_kg_co2e: input.calculation.emissionsKgCO2e, emissions_t_co2e: input.calculation.emissionsTCO2e, calculated_by: input.userId,
   }).select('*').single();

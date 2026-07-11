@@ -3,6 +3,7 @@ import { useSubscription } from '../hooks/useSubscription.ts';
 import { useEntitlements } from '../hooks/useEntitlements.ts';
 import { safeFetchJson } from '../services/apiClient.ts';
 import { useEffect, useState } from 'react';
+import LocalizationSettings from './LocalizationSettings.tsx';
 
 const usageMap: Record<string, string> = { facilities: 'facilities', users: 'users', reports_month: 'reportsGenerated', storage_gb: 'storageGb' };
 
@@ -24,6 +25,7 @@ export default function SubscriptionSettings() {
     {message && <div className="text-xs border border-brand-border bg-white p-3 flex items-center gap-2"><AlertCircle className="w-4 h-4 text-brand-forest" />{message}</div>}
     <section className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">{displayedLimits.filter((limit: any) => usageMap[limit.key]).map((limit: any) => { const used = Number(limit.current ?? usage?.[usageMap[limit.key]] ?? 0); const percent = limit.type === 'number' && limit.value > 0 ? Math.min(100, (used / limit.value) * 100) : 0; return <div key={limit.key} className="bg-white border border-brand-border p-4"><div className="flex justify-between text-xs"><span className="font-bold">{limit.key.replaceAll('_', ' ')}</span><span>{used} / {limit.displayValue}</span></div>{limit.type === 'number' ? <div className="h-1.5 mt-3 bg-brand-offwhite"><div className="h-full bg-brand-forest" style={{ width: `${percent}%` }} /></div> : <p className="text-[10px] text-gray-400 mt-3">{limit.displayValue} capacity.</p>}</div>; })}</section>
     <section className="bg-white border border-brand-border p-6"><div className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-brand-forest" /><h2 className="font-black">Change plan</h2></div><div className="inline-flex mt-4 p-1 bg-brand-offwhite border border-brand-border rounded text-xs font-bold"><button onClick={() => setBillingInterval('monthly')} className={`px-3 py-1.5 rounded ${billingInterval === 'monthly' ? 'bg-brand-charcoal text-white' : 'text-gray-500'}`}>Monthly</button><button onClick={() => setBillingInterval('yearly')} className={`px-3 py-1.5 rounded ${billingInterval === 'yearly' ? 'bg-brand-charcoal text-white' : 'text-gray-500'}`}>Yearly</button></div><div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3 mt-5">{plans.map((item) => <button key={item.id} onClick={() => void perform('/api/subscription/upgrade', { planId: item.id, billingInterval })} disabled={busy || (item.id === plan?.id && billingInterval === subscription?.billingInterval)} className="border border-brand-border p-4 text-left hover:border-brand-forest disabled:opacity-50"><div className="flex justify-between"><span className="font-bold text-sm">{item.name}</span>{item.recommended && <CheckCircle2 className="w-4 h-4 text-brand-forest" />}</div><span className="block text-[10px] text-gray-500 mt-2">{item.badge || 'Select plan'}</span></button>)}</div></section>
-    <p className="text-[10px] font-mono text-gray-400 flex gap-2"><RefreshCw className="w-3 h-3" /> Limits and plan features are visible here but are not enforced yet.</p>
+    <p className="text-[10px] font-mono text-gray-400 flex gap-2"><RefreshCw className="w-3 h-3" /> Usage, plan entitlements, and operational license state are evaluated by protected API routes.</p>
+    <LocalizationSettings />
   </div>;
 }

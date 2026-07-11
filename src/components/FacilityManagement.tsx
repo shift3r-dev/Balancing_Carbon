@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Plus, Edit, Trash2, Building, MapPin, Package, Fuel, Zap, 
-  RefreshCw, CheckCircle, Scale, ShieldAlert, X, Shield 
+  RefreshCw, CheckCircle, Scale, ShieldAlert, X, Shield, Copy, Check
 } from 'lucide-react';
 import { Facility } from '../types.ts';
 
@@ -20,6 +20,7 @@ export default function FacilityManagement({
 }: FacilityProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -170,6 +171,10 @@ export default function FacilityManagement({
                 </div>
 
                 <h3 className="font-bold text-brand-charcoal text-sm leading-snug mb-1">{f.name}</h3>
+                <div className="mb-2 flex items-center gap-1.5 rounded border border-brand-border bg-brand-offwhite px-2 py-1.5">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-gray-500" title={f.id}>ID: {f.id}</span>
+                  <button type="button" onClick={async () => { await navigator.clipboard.writeText(f.id); setCopiedId(f.id); window.setTimeout(() => setCopiedId(null), 1500); }} className="shrink-0 p-1 text-brand-forest hover:bg-brand-sage rounded" title="Copy facility ID">{copiedId === f.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}</button>
+                </div>
                 <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-4">
                   <MapPin className="w-3 h-3 text-gray-400" /> {f.location}
                 </div>

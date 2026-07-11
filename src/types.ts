@@ -19,6 +19,8 @@ export interface EnergyRecord {
   sourceType: string;
   energyType: string;
   quantity: number; unit: string; scope: 'scope-1' | 'scope-2';
+  inputQuantity?: number; inputUnit?: string; canonicalQuantity?: number; canonicalUnit?: string; conversionFactor?: number; conversionPath?: string[];
+  displayValue?: number; displayUnit?: string;
   emissionFactorId: string; emissionFactorValue: number; emissionFactorUnit: string;
   emissionsKgCO2e: number; emissionsTCO2e: number;
   sourceDocument: string; notes: string; emissions: number;
@@ -30,6 +32,7 @@ export interface EnergyRecord {
 export interface ProductionRecord {
   id: string; organisationId: string; facilityId: string; date: string; reportingPeriod: string;
   quantity: number; unit: string; sourceDocument: string; notes: string;
+  inputQuantity?: number; inputUnit?: string; canonicalQuantity?: number; canonicalUnit?: string; conversionFactor?: number; conversionPath?: string[];
 }
 export interface DiagnosticQuestionResponse {
   id: string; organisationId: string; facilityId: string; questionId: string; industry: string;
@@ -173,4 +176,4 @@ export type ViewState =
   | 'dashboard-energy' | 'dashboard-emissions-scope1' | 'dashboard-emissions-scope2' | 'dashboard-emissions-scope3'
   | 'dashboard-calculator' | 'dashboard-intelligence' | 'dashboard-opportunities' | 'dashboard-scenarios' | 'dashboard-projects'
   | 'dashboard-esg' | 'dashboard-questionnaires' | 'dashboard-documents' | 'dashboard-reports'
-  | 'dashboard-ai-assistant' | 'dashboard-settings';
+  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform';

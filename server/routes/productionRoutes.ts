@@ -6,6 +6,7 @@ import { str } from '../requestUtils.js';
 import { mapProductionRecord } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
 import { requireOperationalLicense } from '../middleware/entitlements.js';
+import { convertMeasurement, resolveUnit } from '../measurementService.js';
 
 export function createProductionRouter() {
   const router = Router();
@@ -33,17 +34,21 @@ export function createProductionRouter() {
       }
       const { data: facility, error: facilityError } = await supabaseAdmin.from('facilities').select('id').eq('id', facilityId).eq('organisation_id', p.organisation_id).single();
       if (facilityError || !facility) return res.status(404).json({ error: 'Facility not found.' });
+      const inputUnit = await resolveUnit(unit);
+      if (!inputUnit || !['unitcat-production', 'unitcat-mass'].includes(inputUnit.category_id)) return res.status(400).json({ error: `${unit} is not a valid production unit.` });
+      const canonicalUnit = inputUnit.category_id === 'unitcat-mass' ? 'kg' : 'production-kg';
+      const converted = await convertMeasurement({ value: quantity, fromUnit: unit, toUnit: canonicalUnit, organisationId: p.organisation_id, userId: req.authUser!.id, context: 'production-entry', audit: true });
       const row = {
         id: `prod-${randomUUID()}`, organisation_id: p.organisation_id, facility_id: facilityId,
         date: str(b.date) || new Date().toISOString().split('T')[0],
         reporting_period: str(b.reportingPeriod, b.reporting_period) || 'FY 2025-26',
-        quantity, unit, source_document: str(b.sourceDocument, b.source_document), notes: str(b.notes),
+        quantity, unit, input_quantity: quantity, input_unit: converted.fromUnit, canonical_quantity: converted.canonicalValue, canonical_unit: converted.canonicalUnit, conversion_factor: converted.conversionFactor, conversion_path: converted.conversionPath, source_document: str(b.sourceDocument, b.source_document), notes: str(b.notes),
       };
       const { data, error } = await supabaseAdmin.from('production_records').insert(row).select('*').single();
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create production record.' });
       const { data: activity, error: activityError } = await supabaseAdmin.from('activity_records').insert({
         id: `activity-production-${randomUUID()}`, organisation_id: p.organisation_id, facility_id: facilityId, activity_category: 'production', source_type: 'Production Output',
-        activity_date: row.date, reporting_period: row.reporting_period, quantity, unit, source_document: row.source_document, notes: row.notes,
+        activity_date: row.date, reporting_period: row.reporting_period, quantity, unit, input_quantity: quantity, input_unit: converted.fromUnit, canonical_quantity: converted.canonicalValue, canonical_unit: converted.canonicalUnit, conversion_factor: converted.conversionFactor, conversion_path: converted.conversionPath, source_document: row.source_document, notes: row.notes,
         verification_status: row.source_document ? 'submitted' : 'draft', created_by: req.authUser!.id, updated_by: req.authUser!.id,
       }).select('*').single();
       if (activityError) return res.status(500).json({ error: activityError.message });

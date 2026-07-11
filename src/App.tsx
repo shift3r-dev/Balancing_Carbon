@@ -41,6 +41,7 @@ import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
 import DocumentCentre from "./components/DocumentCentre.tsx";
 import AIAssistantModule from "./components/AIAssistantModule.tsx";
 import SubscriptionSettings from "./components/SubscriptionSettings.tsx";
+import ReportingWorkspace from "./components/ReportingWorkspace.tsx";
 import EntitlementGate from "./components/EntitlementGate.tsx";
 import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
@@ -49,6 +50,8 @@ const ServiceFirstFlow = lazy(() => import("./components/ServiceFirstFlow.tsx"))
 const SectorServicesFlow = lazy(() => import("./components/SectorServicesFlow.tsx"));
 const CarbonIntelligenceHub = lazy(() => import("./components/CarbonIntelligenceHub.tsx"));
 const PricingPage = lazy(() => import("./components/PricingPage.tsx"));
+const MetadataStudio = lazy(() => import("./components/MetadataStudio.tsx"));
+const EnterpriseDataHub = lazy(() => import("./components/EnterpriseDataHub.tsx"));
 
 // Shared interfaces
 import {
@@ -227,6 +230,22 @@ export default function App() {
     }
     fetchInitialData();
   }, [authenticated, currentUser]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const refreshOperationalLedgers = async () => {
+      const [facilityData, energyData, productionData] = await Promise.all([
+        safeFetchJson('/api/facilities', undefined, { facilities: [] }),
+        safeFetchJson('/api/energy', undefined, { records: [] }),
+        safeFetchJson('/api/production', undefined, { records: [] }),
+      ]);
+      setFacilities(Array.isArray(facilityData) ? facilityData : (facilityData?.facilities ?? []));
+      setRecords(Array.isArray(energyData) ? energyData : (energyData?.records ?? []));
+      setProductionRecords(Array.isArray(productionData) ? productionData : (productionData?.records ?? []));
+    };
+    window.addEventListener('balancing-carbon-ledger-updated', refreshOperationalLedgers);
+    return () => window.removeEventListener('balancing-carbon-ledger-updated', refreshOperationalLedgers);
+  }, [authenticated]);
 
   const unwrapEntity = <T,>(response: any, keys: string[]): T | null => {
     if (!response) return null;
@@ -1214,7 +1233,17 @@ export default function App() {
                     onDeleteDocument={handleDeleteDocument}
                   />
                 )}
-                {currentView === "dashboard-reports" && renderReportsCentre()}
+                {currentView === "dashboard-reports" && <ReportingWorkspace />}
+                {currentView === "dashboard-metadata" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading Metadata Studio..." />}>
+                    <MetadataStudio />
+                  </Suspense>
+                )}
+                {currentView === "dashboard-data-platform" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading Enterprise Data Hub..." />}>
+                    <EnterpriseDataHub />
+                  </Suspense>
+                )}
 
                 {/* Company profile entity updates */}
                 {currentView === "dashboard-company" && renderCompanyProfile()}

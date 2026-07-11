@@ -9,6 +9,8 @@ import { str } from '../requestUtils.js';
 import { mapEnergyRecord } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
 import { requireOperationalLicense } from '../middleware/entitlements.js';
+import { convertActivityMeasurement, smartDisplay } from '../measurementService.js';
+import { getOrganizationLocalization } from '../localizationService.js';
 
 function calculationMetadata(sourceType: string, calculation: ReturnType<typeof calculateActivityEmissions>, scope: string) {
   return {
@@ -43,7 +45,15 @@ export function createEnergyRouter() {
       if (typeof req.query.dateTo === 'string') query = query.lte('date', req.query.dateTo);
       const filtered = await query.order('date', { ascending: false });
       if (filtered.error) return res.status(500).json({ error: filtered.error.message });
-      res.json({ records: (filtered.data ?? []).map(mapEnergyRecord) });
+      const localization = await getOrganizationLocalization(p.organisation_id, req.authUser!.id);
+      const records = await Promise.all((filtered.data ?? []).map(async (record) => {
+        const mapped = mapEnergyRecord(record);
+        try {
+          const display = await smartDisplay({ value: mapped.canonicalQuantity, unit: mapped.canonicalUnit, measurementSystem: localization.measurementSystem });
+          return { ...mapped, displayValue: display.displayValue, displayUnit: display.displayUnit };
+        } catch { return { ...mapped, displayValue: mapped.inputQuantity, displayUnit: mapped.inputUnit }; }
+      }));
+      res.json({ records });
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load energy records.' }); }
   });
 
@@ -65,9 +75,15 @@ export function createEnergyRouter() {
       const factor = await resolveRegistryFactor(sourceType, facility.country || 'India', activityDate);
       if (!factor) return res.status(400).json({ error: `No active emission factor found for source type: ${sourceType}.` });
       const activityType = str(b.activityType, b.activity_type) || deriveActivityType(sourceType);
+      let converted;
+      try {
+        converted = await convertActivityMeasurement({ quantity, inputUnit: str(b.unit) || factor.activityUnit, factorUnit: factor.activityUnit, sourceType, organisationId: p.organisation_id, userId: req.authUser!.id });
+      } catch (error) {
+        return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid measurement unit.' });
+      }
       let calculation;
       try {
-        calculation = calculateActivityEmissions({ quantity, activityUnit: str(b.unit) || factor.activityUnit, sourceType, emissionFactor: factor });
+        calculation = calculateActivityEmissions({ quantity: converted.factorValue, activityUnit: factor.activityUnit, sourceType, emissionFactor: factor });
       } catch (error) {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid activity record.' });
       }
@@ -76,9 +92,10 @@ export function createEnergyRouter() {
         id: `rec-${randomUUID()}`, organisation_id: p.organisation_id, facility_id: facilityId,
         date: activityDate,
         reporting_period: str(b.reportingPeriod, b.reporting_period) || facility.reporting_period || new Date().getFullYear().toString(),
-        activity_type: activityType, source_type: sourceType, energy_type: sourceType, quantity,
+        activity_type: activityType, source_type: sourceType, energy_type: sourceType, quantity: converted.factorValue,
         unit: calculation.normalizedUnit, scope: factor.scope,
-        emission_factor_id: calculation.emissionFactorId, emission_factor_value: calculation.emissionFactorValue,
+        input_quantity: converted.inputValue, input_unit: converted.inputUnit, canonical_quantity: converted.canonicalValue, canonical_unit: converted.canonicalUnit, conversion_factor: converted.conversionFactor, conversion_path: converted.conversionPath,
+        emission_factor_id: null, registry_emission_factor_id: calculation.emissionFactorId, emission_factor_value: calculation.emissionFactorValue,
         emission_factor_unit: calculation.emissionFactorUnit, emissions_kg_co2e: calculation.emissionsKgCO2e,
         emissions_t_co2e: calculation.emissionsTCO2e, source_document: sourceDocument,
         notes: str(b.notes), emissions: calculation.emissionsTCO2e, audit_trail: metadata, calculation_metadata: metadata,
@@ -87,9 +104,9 @@ export function createEnergyRouter() {
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create energy record.' });
       const lineage = await saveCalculationLineage({
         organisationId: p.organisation_id, userId: req.authUser!.id, legacyEnergyRecordId: data.id, facilityId, sourceType,
-        activityDate, reportingPeriod: row.reporting_period, quantity, unit: row.unit, supplier: str(b.supplier), invoiceNumber: str(b.invoiceNumber, b.invoice_number),
+        activityDate, reportingPeriod: row.reporting_period, quantity: converted.factorValue, unit: row.unit, supplier: str(b.supplier), invoiceNumber: str(b.invoiceNumber, b.invoice_number),
         cost: b.cost === undefined || b.cost === '' ? null : Number(b.cost), currency: str(b.currency) || 'INR', sourceDocument: row.source_document,
-        notes: row.notes, factor, calculation, documentIds: Array.isArray(b.documentIds) ? b.documentIds : b.documentId ? [b.documentId] : [],
+        notes: row.notes, factor, calculation, documentIds: Array.isArray(b.documentIds) ? b.documentIds : b.documentId ? [b.documentId] : [], inputQuantity: converted.inputValue, inputUnit: converted.inputUnit, canonicalQuantity: converted.canonicalValue, canonicalUnit: converted.canonicalUnit, conversionFactor: converted.conversionFactor, conversionPath: converted.conversionPath,
       });
       await refreshFacilityAggregates(p.organisation_id, facilityId);
       res.status(201).json({ success: true, record: mapEnergyRecord(data), activity: lineage.activity, calculationRecord: lineage.calculationRecord });
@@ -105,9 +122,15 @@ export function createEnergyRouter() {
       const quantity = b.quantity !== undefined ? Number(b.quantity) : Number(existing.quantity ?? 0);
       const factor = await resolveRegistryFactor(sourceType, existing.country || 'India', str(b.date) || existing.date);
       if (!factor) return res.status(400).json({ error: `No active emission factor found for source type: ${sourceType}.` });
+      let converted;
+      try {
+        converted = await convertActivityMeasurement({ quantity, inputUnit: str(b.unit) || existing.input_unit || existing.unit || factor.activityUnit, factorUnit: factor.activityUnit, sourceType, organisationId: p.organisation_id, userId: req.authUser!.id });
+      } catch (error) {
+        return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid measurement unit.' });
+      }
       let calculation;
       try {
-        calculation = calculateActivityEmissions({ quantity, activityUnit: str(b.unit) || existing.unit || factor.activityUnit, sourceType, emissionFactor: factor });
+        calculation = calculateActivityEmissions({ quantity: converted.factorValue, activityUnit: factor.activityUnit, sourceType, emissionFactor: factor });
       } catch (error) {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid activity record.' });
       }
@@ -115,7 +138,7 @@ export function createEnergyRouter() {
       const updates = {
         date: str(b.date) || existing.date, reporting_period: str(b.reportingPeriod, b.reporting_period) || existing.reporting_period,
         activity_type: str(b.activityType, b.activity_type) || deriveActivityType(sourceType), source_type: sourceType, energy_type: sourceType,
-        quantity, unit: calculation.normalizedUnit, scope: factor.scope, emission_factor_id: calculation.emissionFactorId,
+        quantity: converted.factorValue, unit: calculation.normalizedUnit, scope: factor.scope, input_quantity: converted.inputValue, input_unit: converted.inputUnit, canonical_quantity: converted.canonicalValue, canonical_unit: converted.canonicalUnit, conversion_factor: converted.conversionFactor, conversion_path: converted.conversionPath, emission_factor_id: null, registry_emission_factor_id: calculation.emissionFactorId,
         emission_factor_value: calculation.emissionFactorValue, emission_factor_unit: calculation.emissionFactorUnit,
         emissions_kg_co2e: calculation.emissionsKgCO2e, emissions_t_co2e: calculation.emissionsTCO2e,
         source_document: str(b.sourceDocument, b.source_document) || existing.source_document,
@@ -127,9 +150,9 @@ export function createEnergyRouter() {
       const { data: previousActivity } = await supabaseAdmin.from('activity_records').select('id, version_number').eq('legacy_energy_record_id', existing.id).eq('organisation_id', p.organisation_id).is('deleted_at', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
       const lineage = await saveCalculationLineage({
         organisationId: p.organisation_id, userId: req.authUser!.id, legacyEnergyRecordId: data.id, facilityId: existing.facility_id, sourceType,
-        activityDate: updates.date, reportingPeriod: updates.reporting_period, quantity, unit: updates.unit, supplier: str(b.supplier), invoiceNumber: str(b.invoiceNumber, b.invoice_number),
+        activityDate: updates.date, reportingPeriod: updates.reporting_period, quantity: converted.factorValue, unit: updates.unit, supplier: str(b.supplier), invoiceNumber: str(b.invoiceNumber, b.invoice_number),
         cost: b.cost === undefined || b.cost === '' ? null : Number(b.cost), currency: str(b.currency) || 'INR', sourceDocument: updates.source_document,
-        notes: updates.notes, factor, calculation, documentIds: Array.isArray(b.documentIds) ? b.documentIds : b.documentId ? [b.documentId] : [], supersedesActivityId: previousActivity?.id ?? null, versionNumber: Number(previousActivity?.version_number ?? 0) + 1,
+        notes: updates.notes, factor, calculation, documentIds: Array.isArray(b.documentIds) ? b.documentIds : b.documentId ? [b.documentId] : [], supersedesActivityId: previousActivity?.id ?? null, versionNumber: Number(previousActivity?.version_number ?? 0) + 1, inputQuantity: converted.inputValue, inputUnit: converted.inputUnit, canonicalQuantity: converted.canonicalValue, canonicalUnit: converted.canonicalUnit, conversionFactor: converted.conversionFactor, conversionPath: converted.conversionPath,
       });
       await refreshFacilityAggregates(p.organisation_id, existing.facility_id);
       res.json({ success: true, record: mapEnergyRecord(data), activity: lineage.activity, calculationRecord: lineage.calculationRecord });

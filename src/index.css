@@ -1,6 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
+@layer components {
+  .input { @apply mt-1.5 w-full border border-brand-border rounded p-2.5 bg-white text-xs outline-none focus:ring-1 focus:ring-brand-forest; }
+  .btn-primary { @apply inline-flex items-center gap-2 bg-brand-forest text-white rounded px-4 py-2.5 text-xs font-bold disabled:opacity-50; }
+  .btn-secondary { @apply inline-flex items-center justify-center gap-2 bg-brand-sage text-brand-forest rounded px-3 py-2.5 text-xs font-bold disabled:opacity-50; }
+  .btn-dark { @apply inline-flex items-center gap-2 bg-brand-charcoal text-white rounded px-4 py-2.5 text-xs font-bold disabled:opacity-50; }
+  .btn-link { @apply inline-flex items-center gap-1 text-xs font-bold text-brand-forest disabled:opacity-50; }
+  .btn-small { @apply inline-flex items-center gap-1 border border-brand-border rounded px-2 py-1 text-[10px] font-bold; }
+  .btn-small-green { @apply inline-flex items-center gap-1 bg-brand-sage text-brand-forest rounded px-2 py-1 text-[10px] font-bold; }
+  .btn-small-dark { @apply inline-flex items-center gap-1 bg-brand-charcoal text-white rounded px-2 py-1 text-[10px] font-bold; }
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;

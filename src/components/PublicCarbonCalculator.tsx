@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
@@ -101,6 +101,9 @@ const evidenceDocs = [
 const formatNumber = (value: number, digits = 2) =>
   value.toLocaleString('en-US', { maximumFractionDigits: digits });
 
+type PublicUnit = { id: string; code: string; name: string; symbol: string; category_id: string };
+type PublicInputKey = 'steelCoal' | 'steelLimestone' | 'steelElectricity' | 'steelProduction' | 'cementCoal' | 'cementClinker' | 'cementBypassDust' | 'cementProduction' | 'aluminumAnode' | 'aluminumElectricity' | 'aluminumProduction' | 'chemGasFlared' | 'chemN2O' | 'chemProduction' | 'textileYarnWeight' | 'textileElectricity' | 'textileDiesel' | 'logisticsWeight' | 'logisticsDistance' | 'serviceITEnergy' | 'servicePUE' | 'serviceEmployees' | 'serviceCommuteDays' | 'serviceCommuteAvgDistance';
+
 export default function PublicCarbonCalculator({
   onRegister,
   ctaTitle = 'Move From Sandbox To Ledger',
@@ -114,10 +117,30 @@ export default function PublicCarbonCalculator({
     [evidenceDocs[3]]: true,
   });
   const [downloaded, setDownloaded] = useState(false);
+  const [publicUnits, setPublicUnits] = useState<PublicUnit[]>([]);
+  const [unitRegistryError, setUnitRegistryError] = useState('');
+  const [displayUnits, setDisplayUnits] = useState<Record<PublicInputKey, string>>({ steelCoal: 'tonne', steelLimestone: 'tonne', steelElectricity: 'MWh', steelProduction: 'tonne', cementCoal: 'tonne', cementClinker: 'tonne', cementBypassDust: 'tonne', cementProduction: 'tonne', aluminumAnode: 'tonne', aluminumElectricity: 'MWh', aluminumProduction: 'tonne', chemGasFlared: 'SCM', chemN2O: 'tonne', chemProduction: 'tonne', textileYarnWeight: 'kg', textileElectricity: 'kWh', textileDiesel: 'litre', logisticsWeight: 'tonne', logisticsDistance: 'km', serviceITEnergy: 'MWh', servicePUE: 'PUE', serviceEmployees: 'person', serviceCommuteDays: 'day', serviceCommuteAvgDistance: 'km' });
 
-  const setNumber = (key: keyof typeof initialInputs, value: string) => {
-    setInputs((prev) => ({ ...prev, [key]: Math.max(0, Number(value) || 0) }));
-  };
+  useEffect(() => {
+    void fetch('/api/public/units')
+      .then((response) => {
+        if (!response.ok) throw new Error(`Unit registry request failed (${response.status})`);
+        return response.json();
+      })
+      .then((data) => {
+        const loadedUnits = data?.units ?? [];
+        setPublicUnits(loadedUnits);
+        setUnitRegistryError(loadedUnits.length ? '' : 'No compatible units are available from the registry.');
+      })
+      .catch(() => {
+        setPublicUnits([]);
+        setUnitRegistryError('Unit choices are unavailable. Restart the local server and refresh this page.');
+      });
+  }, []);
+
+  const registryInput = (key: PublicInputKey, label: string, category: RegistryCategory, baseUnit: string, hint: string) => (
+    <RegistryInput label={label} category={category} baseUnit={baseUnit} displayUnit={displayUnits[key]} units={publicUnits} registryError={unitRegistryError} value={inputs[key] as number} onChange={(value) => setInputs((prev) => ({ ...prev, [key]: value }))} onUnitChange={(unit) => setDisplayUnits((prev) => ({ ...prev, [key]: unit }))} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint={hint} />
+  );
 
   const result = useMemo(() => {
     let scope1 = 0;
@@ -343,27 +366,27 @@ export default function PublicCarbonCalculator({
 
           {activeSector === 'steel' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Coal consumed" unit="metric tonnes" value={inputs.steelCoal} onChange={(value) => setNumber('steelCoal', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 1 combustion, 2.42 tCO2e/t." />
-              <Input label="Limestone feed" unit="metric tonnes" value={inputs.steelLimestone} onChange={(value) => setNumber('steelLimestone', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Process CO2 proxy, 44% conversion." />
-              <Input label="Grid electricity" unit="MWh" value={inputs.steelElectricity} onChange={(value) => setNumber('steelElectricity', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 2, 0.716 tCO2e/MWh." />
-              <Input label="Steel output" unit="metric tonnes" value={inputs.steelProduction} onChange={(value) => setNumber('steelProduction', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Intensity denominator." />
+              {registryInput('steelCoal', 'Coal consumed', 'mass', 'tonne', 'Scope 1 combustion, 2.42 tCO2e/t.')}
+              {registryInput('steelLimestone', 'Limestone feed', 'mass', 'tonne', 'Process CO2 proxy, 44% conversion.')}
+              {registryInput('steelElectricity', 'Grid electricity', 'energy', 'MWh', 'Scope 2, 0.716 tCO2e/MWh.')}
+              {registryInput('steelProduction', 'Steel output', 'mass', 'tonne', 'Intensity denominator.')}
             </div>
           )}
 
           {activeSector === 'cement' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Kiln coal" unit="metric tonnes" value={inputs.cementCoal} onChange={(value) => setNumber('cementCoal', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 1 combustion." />
-              <Input label="Clinker produced" unit="metric tonnes" value={inputs.cementClinker} onChange={(value) => setNumber('cementClinker', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Calcination proxy, 0.52 tCO2/t clinker." />
-              <Input label="Bypass dust loss" unit="metric tonnes" value={inputs.cementBypassDust} onChange={(value) => setNumber('cementBypassDust', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Corrective CKD adjustment." />
-              <Input label="Cement output" unit="metric tonnes" value={inputs.cementProduction} onChange={(value) => setNumber('cementProduction', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Grinding power estimated at 110 kWh/t." />
+              {registryInput('cementCoal', 'Kiln coal', 'mass', 'tonne', 'Scope 1 combustion.')}
+              {registryInput('cementClinker', 'Clinker produced', 'mass', 'tonne', 'Calcination proxy, 0.52 tCO2/t clinker.')}
+              {registryInput('cementBypassDust', 'Bypass dust loss', 'mass', 'tonne', 'Corrective CKD adjustment.')}
+              {registryInput('cementProduction', 'Cement output', 'mass', 'tonne', 'Grinding power estimated at 110 kWh/t.')}
             </div>
           )}
 
           {activeSector === 'aluminum' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Carbon anode consumed" unit="metric tonnes" value={inputs.aluminumAnode} onChange={(value) => setNumber('aluminumAnode', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Anode oxidation, 3.21 tCO2e/t." />
-              <Input label="Grid electricity" unit="MWh" value={inputs.aluminumElectricity} onChange={(value) => setNumber('aluminumElectricity', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Used when captive power is off." />
-              <Input label="Aluminum output" unit="metric tonnes" value={inputs.aluminumProduction} onChange={(value) => setNumber('aluminumProduction', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Intensity denominator." />
+              {registryInput('aluminumAnode', 'Carbon anode consumed', 'mass', 'tonne', 'Anode oxidation, 3.21 tCO2e/t.')}
+              {registryInput('aluminumElectricity', 'Grid electricity', 'energy', 'MWh', 'Used when captive power is off.')}
+              {registryInput('aluminumProduction', 'Aluminum output', 'mass', 'tonne', 'Intensity denominator.')}
               <label className="flex items-center justify-between gap-3 border border-brand-border rounded-xl p-3 bg-brand-offwhite text-xs font-bold text-brand-charcoal">
                 Captive coal power
                 <input
@@ -378,17 +401,17 @@ export default function PublicCarbonCalculator({
 
           {activeSector === 'chemicals' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Natural gas flared" unit="SCM" value={inputs.chemGasFlared} onChange={(value) => setNumber('chemGasFlared', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="98% combustion efficiency proxy." />
-              <Input label="N2O released" unit="metric tonnes" value={inputs.chemN2O} onChange={(value) => setNumber('chemN2O', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="AR6 GWP: 273." />
-              <Input label="Chemical output" unit="metric tonnes" value={inputs.chemProduction} onChange={(value) => setNumber('chemProduction', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Energy and intensity denominator." />
+              {registryInput('chemGasFlared', 'Natural gas flared', 'volume', 'SCM', '98% combustion efficiency proxy.')}
+              {registryInput('chemN2O', 'N2O released', 'mass', 'tonne', 'AR6 GWP: 273.')}
+              {registryInput('chemProduction', 'Chemical output', 'mass', 'tonne', 'Energy and intensity denominator.')}
             </div>
           )}
 
           {activeSector === 'textiles' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="Cotton/yarn feed" unit="kg" value={inputs.textileYarnWeight} onChange={(value) => setNumber('textileYarnWeight', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 3 sourcing proxy." />
-              <Input label="Spinning electricity" unit="kWh" value={inputs.textileElectricity} onChange={(value) => setNumber('textileElectricity', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 2 grid draw." />
-              <Input label="Diesel generator fuel" unit="litres" value={inputs.textileDiesel} onChange={(value) => setNumber('textileDiesel', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Scope 1 backup power." />
+              {registryInput('textileYarnWeight', 'Cotton/yarn feed', 'mass', 'kg', 'Scope 3 sourcing proxy.')}
+              {registryInput('textileElectricity', 'Spinning electricity', 'energy', 'kWh', 'Scope 2 grid draw.')}
+              {registryInput('textileDiesel', 'Diesel generator fuel', 'volume', 'litre', 'Scope 1 backup power.')}
             </div>
           )}
 
@@ -408,19 +431,19 @@ export default function PublicCarbonCalculator({
                 ))}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Cargo weight" unit="metric tonnes" value={inputs.logisticsWeight} onChange={(value) => setNumber('logisticsWeight', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Freight mass." />
-                <Input label="Travel distance" unit="km" value={inputs.logisticsDistance} onChange={(value) => setNumber('logisticsDistance', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Used for tonne-km." />
+                {registryInput('logisticsWeight', 'Cargo weight', 'mass', 'tonne', 'Freight mass.')}
+                {registryInput('logisticsDistance', 'Travel distance', 'distance', 'km', 'Used for tonne-km.')}
               </div>
             </div>
           )}
 
           {activeSector === 'services' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input label="IT infrastructure energy" unit="MWh" value={inputs.serviceITEnergy} onChange={(value) => setNumber('serviceITEnergy', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Server and equipment power." />
-              <Input label="Power Usage Effectiveness" unit="PUE" value={inputs.servicePUE} onChange={(value) => setNumber('servicePUE', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Cooling and overhead multiplier." />
-              <Input label="Employees" unit="people" value={inputs.serviceEmployees} onChange={(value) => setNumber('serviceEmployees', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Commute denominator." />
-              <Input label="Commute days" unit="days/year" value={inputs.serviceCommuteDays} onChange={(value) => setNumber('serviceCommuteDays', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Annual work commute days." />
-              <Input label="Average commute distance" unit="km/day" value={inputs.serviceCommuteAvgDistance} onChange={(value) => setNumber('serviceCommuteAvgDistance', value)} inputClass={inputClass} labelClass={labelClass} hintClass={hintClass} hint="Passenger-km proxy." />
+              {registryInput('serviceITEnergy', 'IT infrastructure energy', 'energy', 'MWh', 'Server and equipment power.')}
+              {registryInput('servicePUE', 'Power Usage Effectiveness', 'ratio', 'PUE', 'Cooling and overhead multiplier.')}
+              {registryInput('serviceEmployees', 'Employees', 'count', 'person', 'Commute denominator.')}
+              {registryInput('serviceCommuteDays', 'Commute days', 'time', 'day', 'Annual work commute days.')}
+              {registryInput('serviceCommuteAvgDistance', 'Average commute distance', 'distance', 'km', 'Passenger-km proxy.')}
             </div>
           )}
 
@@ -556,37 +579,30 @@ export default function PublicCarbonCalculator({
   );
 }
 
-function Input({
-  label,
-  unit,
-  value,
-  onChange,
-  inputClass,
-  labelClass,
-  hintClass,
-  hint,
-}: {
-  label: string;
-  unit: string;
-  value: number;
-  onChange: (value: string) => void;
-  inputClass: string;
-  labelClass: string;
-  hintClass: string;
-  hint: string;
+type RegistryCategory = 'mass' | 'energy' | 'volume' | 'distance' | 'time' | 'count' | 'ratio';
+const registryCategoryIds: Record<RegistryCategory, string> = { mass: 'unitcat-mass', energy: 'unitcat-energy', volume: 'unitcat-volume', distance: 'unitcat-distance', time: 'unitcat-time', count: 'unitcat-count', ratio: 'unitcat-ratio' };
+
+function RegistryInput({ label, category, baseUnit, displayUnit, units, registryError, value, onChange, onUnitChange, inputClass, labelClass, hintClass, hint }: {
+  label: string; category: RegistryCategory; baseUnit: string; displayUnit: string; units: PublicUnit[]; registryError: string; value: number; onChange: (value: number) => void; onUnitChange: (unit: string) => void; inputClass: string; labelClass: string; hintClass: string; hint: string;
 }) {
-  return (
-    <label>
-      <span className={labelClass}>{label}</span>
-      <div className="flex">
-        <input type="number" min="0" step="any" value={value} onChange={(e) => onChange(e.target.value)} className={`${inputClass} rounded-r-none`} />
-        <span className="mt-1.5 bg-brand-sage text-brand-forest border-y border-r border-brand-border px-3 rounded-r font-mono font-semibold flex items-center justify-center min-w-20 text-[10px]">
-          {unit}
-        </span>
-      </div>
-      <span className={hintClass}>{hint}</span>
-    </label>
-  );
+  const [displayValue, setDisplayValue] = useState(String(value));
+  const categoryUnits = units.filter((unit) => unit.category_id === registryCategoryIds[category]);
+  const convert = async (amount: number, fromUnit: string, toUnit: string) => {
+    const response = await fetch('/api/public/units/convert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: amount, fromUnit, toUnit }) });
+    if (!response.ok) throw new Error('Unit conversion failed.');
+    return response.json();
+  };
+  useEffect(() => {
+    let active = true;
+    void convert(value, baseUnit, displayUnit).then((result) => { if (active) setDisplayValue(String(result.displayValue)); }).catch(() => { if (active) setDisplayValue(String(value)); });
+    return () => { active = false; };
+  }, [value, baseUnit, displayUnit]);
+  const changeUnit = (nextUnit: string) => { onUnitChange(nextUnit); };
+  const changeValue = (nextValue: string) => {
+    setDisplayValue(nextValue); const amount = Number(nextValue); if (!Number.isFinite(amount) || amount < 0) return;
+    void convert(amount, displayUnit, baseUnit).then((result) => onChange(Number(result.displayValue))).catch(() => undefined);
+  };
+  return <label><span className={labelClass}>{label}</span><div className="flex"><input type="number" min="0" step="any" value={displayValue} onChange={(event) => changeValue(event.target.value)} className={`${inputClass} rounded-r-none`} /><select value={displayUnit} onChange={(event) => changeUnit(event.target.value)} className="mt-1.5 bg-brand-sage text-brand-forest border-y border-r border-brand-border px-2 rounded-r font-mono font-semibold min-w-28 text-[10px]">{categoryUnits.length ? categoryUnits.map((unit) => <option key={unit.id} value={unit.code}>{unit.symbol || unit.code}</option>) : <option value={displayUnit}>{displayUnit}</option>}</select></div><span className={hintClass}>{hint}</span>{registryError ? <span className="mt-1 block text-[10px] text-amber-700">{registryError}</span> : null}</label>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

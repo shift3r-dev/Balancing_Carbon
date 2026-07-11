@@ -141,6 +141,8 @@ export default function DashboardSidebar({
           icon: Bot,
           isHot: true,
         },
+        { id: "dashboard-metadata", label: "Metadata Studio", icon: Database },
+        { id: "dashboard-data-platform", label: "Data Hub", icon: Database },
         { id: "dashboard-settings", label: "System Settings", icon: Settings },
         { id: "dashboard-settings", label: "Audit Logs", icon: ClipboardList, badge: "Soon" },
         { id: "dashboard-settings", label: "Notifications", icon: Bell, badge: "Soon" },

@@ -4,6 +4,7 @@ import {
   Settings, CheckCircle, HelpCircle, ChevronRight, Scale 
 } from 'lucide-react';
 import { EnergyRecord, Facility } from '../types.ts';
+import RegistryUnitInput from './RegistryUnitInput.tsx';
 
 interface CarbonEngineProps {
   scopeType: 'scope-1' | 'scope-2' | 'scope-3';
@@ -12,7 +13,7 @@ interface CarbonEngineProps {
 }
 
 export default function CarbonEngineUI({ scopeType, facilities, records = [] }: CarbonEngineProps) {
-  const [simQty, setSimQty] = useState('');
+  const [simQty, setSimQty] = useState(0);
   const [simType, setSimType] = useState('Diesel');
   
   const factors = {
@@ -42,8 +43,8 @@ export default function CarbonEngineUI({ scopeType, facilities, records = [] }: 
   };
 
   const handleSimulate = () => {
-    const qty = parseFloat(simQty);
-    if (isNaN(qty)) return 'Enter a numeric value to calculate';
+    const qty = Number(simQty);
+    if (!Number.isFinite(qty)) return 'Enter a numeric value to calculate';
     const metadata = (factors as any)[simType];
     if (!metadata) return 'Invalid type';
     
@@ -164,7 +165,7 @@ export default function CarbonEngineUI({ scopeType, facilities, records = [] }: 
                 <label className="block font-mono text-gray-500 mb-1">Select Activity Stream</label>
                 <select
                   value={simType}
-                  onChange={(e) => setSimType(e.target.value)}
+                  onChange={(e) => { setSimType(e.target.value); setSimQty(0); }}
                   className="w-full border border-brand-border p-2.5 rounded bg-white text-xs font-mono"
                 >
                   {getFilteredFactors().map(([key, _]) => (
@@ -172,16 +173,7 @@ export default function CarbonEngineUI({ scopeType, facilities, records = [] }: 
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block font-mono text-gray-500 mb-1">Activity Quantity</label>
-                <input
-                  type="number"
-                  placeholder="e.g. 5000"
-                  value={simQty}
-                  onChange={(e) => setSimQty(e.target.value)}
-                  className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono"
-                />
-              </div>
+              <RegistryUnitInput id="scope-simulator-quantity" label="Activity Quantity" unit={String((factors as any)[simType]?.unit ?? '').split('/').pop()} value={simQty} onChange={setSimQty} />
             </div>
 
             {/* Results Block */}

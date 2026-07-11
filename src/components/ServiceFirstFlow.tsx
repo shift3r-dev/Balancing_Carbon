@@ -46,6 +46,7 @@ import {
   Tooltip, 
   Legend 
 } from "recharts";
+import RegistryUnitInput from "./RegistryUnitInput";
 
 // Category configuration to map the 12 services
 const CATEGORIES = [
@@ -714,30 +715,8 @@ designated accredited reviewer outside this prototype workflow.
               <div className="space-y-4">
                 {selectedService.assessmentConfig.inputs.map(input => (
                   <div key={input.id} className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 leading-snug">
-                      {input.label}
-                    </label>
-                    
                     {input.type === "number" ? (
-                      <div className="relative rounded-xl border border-slate-200 bg-slate-50 overflow-hidden shadow-sm">
-                        <input
-                          type="number"
-                          id={`calc-input-${input.id}`}
-                          min={0}
-                          step="any"
-                          value={calculatorInputs[input.id] ?? ""}
-                          onChange={(e) => handleInputChange(input.id, e.target.value === "" ? "" : parseFloat(e.target.value))}
-                          required
-                          className="w-full px-4 py-3 text-xs text-slate-900 font-mono font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-950 transition-all"
-                        />
-                        {input.unit && (
-                          <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-sans">
-                              {input.unit}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                      <RegistryUnitInput id={`calc-input-${input.id}`} label={input.label} unit={input.unit} value={Number(calculatorInputs[input.id] ?? 0)} onChange={(value) => handleInputChange(input.id, value)} />
                     ) : (
                       <select
                         id={`calc-input-${input.id}`}
