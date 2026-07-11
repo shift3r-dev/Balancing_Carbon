@@ -5,6 +5,7 @@ import { type AuthenticatedRequest, getProfile, requireAuth, requirePermission }
 import { str } from '../requestUtils.js';
 import { mapProductionRecord } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
+import { requireOperationalLicense } from '../middleware/entitlements.js';
 
 export function createProductionRouter() {
   const router = Router();
@@ -21,7 +22,7 @@ export function createProductionRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load production records.' }); }
   });
 
-  router.post('/', requireAuth, requirePermission('activity.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/', requireAuth, requireOperationalLicense, requirePermission('activity.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const facilityId = str(b.facilityId, b.facility_id);
@@ -40,7 +41,13 @@ export function createProductionRouter() {
       };
       const { data, error } = await supabaseAdmin.from('production_records').insert(row).select('*').single();
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create production record.' });
-      res.status(201).json({ success: true, record: mapProductionRecord(data) });
+      const { data: activity, error: activityError } = await supabaseAdmin.from('activity_records').insert({
+        id: `activity-production-${randomUUID()}`, organisation_id: p.organisation_id, facility_id: facilityId, activity_category: 'production', source_type: 'Production Output',
+        activity_date: row.date, reporting_period: row.reporting_period, quantity, unit, source_document: row.source_document, notes: row.notes,
+        verification_status: row.source_document ? 'submitted' : 'draft', created_by: req.authUser!.id, updated_by: req.authUser!.id,
+      }).select('*').single();
+      if (activityError) return res.status(500).json({ error: activityError.message });
+      res.status(201).json({ success: true, record: mapProductionRecord(data), activity });
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create production record.' }); }
   });
 

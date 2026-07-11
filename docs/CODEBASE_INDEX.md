@@ -1,0 +1,281 @@
+# Codebase Index
+
+Last reviewed: 2026-07-11 after Phase 5. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
+
+## Folder Tree
+
+```text
+Balancing_Carbon/
+  api/index.ts                     Vercel serverless entry
+  docs/                            Technical documentation
+  public/                          Browser icons and brand image
+  server/
+    config/                        Runtime settings
+    middleware/                    Express cross-cutting controls
+    migrations/                    Ordered Supabase schema migrations
+    routes/                        Express REST routers
+    services/                      Reserved foundation service stubs
+    *.ts                           Accounting, auth, mapping, Supabase helpers
+  src/
+    assets/images/                 Source logo asset
+    components/                    Public-site and dashboard UI modules
+    contexts/                      Client auth context
+    data/                          Public service-catalog content
+    hooks/                         Subscription and entitlement data hooks
+    services/                      Browser API/session client
+  assets/.aistudio/.gitignore      AI Studio artifact metadata
+  index.html                       Vite document shell
+  package.json                     Scripts and dependencies
+  server.ts                        Express composition root
+  vite.config.ts                   Vite/Tailwind configuration
+```
+
+## System Dependency Map
+
+```mermaid
+flowchart LR
+  UI[React App] --> Client[src/services/apiClient]
+  UI --> AuthContext
+  Client --> API[Express server.ts]
+  API --> Auth[Auth + RBAC]
+  Auth --> SupabaseAuth[Supabase Auth]
+  API --> Routers[Domain routers]
+  Routers --> Services[Carbon / Subscription / Entitlement services]
+  Services --> DB[(Supabase PostgreSQL)]
+  DB --> Dashboard[Dashboard reads]
+```
+
+```mermaid
+flowchart LR
+  Ledger[EnergyTracking] --> EnergyAPI[/api/energy]
+  EnergyAPI --> Registry[emission_factor_registry]
+  Registry --> Engine[carbonAccounting.ts]
+  Engine --> Lineage[activity_records + calculation_records]
+  Lineage --> Summary[/api/carbon-summary]
+  Summary --> Dashboard[DashboardOverview]
+```
+
+```mermaid
+flowchart LR
+  Pricing[PricingPage] --> SubscriptionHook[useSubscription]
+  SubscriptionHook --> SubscriptionAPI[/api/subscription]
+  SubscriptionAPI --> SubscriptionService
+  SubscriptionService --> Plans[(plans + subscriptions)]
+  Plans --> Entitlements[(plan_entitlements + limits)]
+  Entitlements --> Gate[EntitlementGate + API middleware]
+```
+
+## API Endpoint Index
+
+| Router | Endpoints | Primary tables/services |
+| --- | --- | --- |
+| Health | `GET /api/health` | Runtime status only |
+| Auth | `POST /api/auth/signup`, `/login`, `/refresh`, `/logout`, `/logout-all`, `/password-reset`, `/password-update`; `GET /me`, `/permissions`, `/roles`, `/memberships`, `/role-catalog`, `/audit-events`; `PATCH /profile`, `/memberships/:id`; `DELETE /memberships/:id`; `POST /invitations` | Supabase Auth, profiles, members, roles, subscriptions, licenses |
+| Organisation | `GET`, `POST /api/organisation` | organisations |
+| Facilities | `GET`, `POST /api/facilities`; `PATCH`, `DELETE /api/facilities/:id`; `POST /api/facilities/:id/archive` | facilities, usage limits |
+| Energy | `GET`, `POST /api/energy`; `PATCH`, `DELETE /api/energy/:id` | energy_records, registry, activity/calculation lineage |
+| Factors | `GET /api/emission-factors` | emission_factor_registry |
+| Production | `GET`, `POST /api/production` | production_records, activity_records |
+| Carbon accounting | `GET /api/carbon-activities`, `/api/carbon-activities/:id/lineage`, `/api/carbon-data-quality`, `/api/carbon-summary`; `PATCH /api/carbon-activities/:id/status`; `POST /api/carbon-activities/:id/recalculate` | activity_records, evidence links, calculation_records |
+| Intelligence | Diagnostic questions/responses, diagnostics, opportunities, scenarios, projects, milestones, measurements under `/api/*` | Phase 2 intelligence tables and deterministic engine |
+| Compliance | ESG question update and OEM survey create/approve under `/api/*` | esg_questions, oem_questionnaires |
+| Reporting | Documents list/create/delete and reports list/create under `/api/*` | documents, reports, usage |
+| Subscription | `GET /api/plans`, `/subscription`, `/subscription/usage`, `/subscription/features`; `POST /subscription/upgrade`, `/cancel`, `/renew` | plans, subscriptions, events/history |
+| Entitlements | `GET /api/entitlements`, `/organization/entitlements`, `/organization/limits`, `/organization/usage`, `/license`; `POST /license/:action` | entitlement and license tables |
+
+## Database Table Index
+
+| Domain | Tables | Status |
+| --- | --- | --- |
+| Tenant core | `organisations`, `profiles`, `facilities`, `organization_members`, `organization_settings` | Active |
+| Carbon ledger | `energy_records`, `production_records`, `emission_factors`, `emission_factor_registry`, `activity_records`, `activity_evidence_links`, `calculation_records` | Active; `emission_factors` is legacy-compatible |
+| Evidence/reporting | `documents`, `reports`, `audit_logs`, `ai_conversations` | Documents/reports active; AI conversations reserved |
+| ESG/intelligence | `esg_questions`, `oem_questionnaires`, `diagnostic_question_responses`, `diagnostic_findings`, `reduction_opportunities`, `reduction_scenarios`, `decarbonization_projects`, `project_milestones`, `project_measurements` | Active except findings are not persisted by current router |
+| RBAC | `roles`, `permissions`, `role_permissions`, `user_roles`, `auth_events`, `organization_invitations` | Active |
+| Subscription | `plans`, `subscriptions`, `plan_features`, `plan_limits`, `subscription_history`, `subscription_events`, `future_invoices`, `future_discounts`, `future_coupons` | Active; `future_*` reserved |
+| Entitlements | `entitlement_categories`, `entitlements`, `plan_entitlements`, `organization_entitlements`, `organization_limits`, `organization_usage`, `usage_events`, `license_assignments`, `license_events` | Active |
+| Reporting foundation | `compliance_frameworks`, `report_templates`, `report_versions`, `report_sections`, `report_evidence_links`, `report_approvals`, `report_exports`, `report_schedules` | Future: Phase 6 foundation only |
+| Legacy enterprise foundation | `feature_flags`, `organization_feature_flags`, `usage_metrics`, `licenses`, `system_settings` | Present but unused by runtime |
+
+## React Component Index
+
+| Component | Role | Status |
+| --- | --- | --- |
+| `App.tsx` | Public routing, dashboard shell, state and API orchestration | Active, high complexity; split by dashboard domain |
+| `DashboardOverview.tsx` | Operational KPIs, trend, facility and data-quality view | Active |
+| `DashboardSidebar.tsx` | Dashboard navigation | Active; contains static tenant/menu labels |
+| `FacilityManagement.tsx` | Facility CRUD UI | Active |
+| `EnergyTracking.tsx` | Energy/fuel and production ledger UI | Active |
+| `CarbonEngineUI.tsx` | Scope-specific ledger explorer | Active |
+| `CarbonIntelligenceHub.tsx` | Diagnostics, scenarios, projects | Active, Professional-gated |
+| `ESGAssessmentModule.tsx` | ESG answer/evidence workflow | Active, Professional-gated |
+| `OEMQuestionnaireModule.tsx` | OEM workflow UI | Active, Professional-gated |
+| `DocumentCentre.tsx` | Document metadata vault | Active |
+| `SubscriptionSettings.tsx` | Plan, usage, license settings | Active |
+| `EntitlementGate.tsx` | Locked-state wrapper | Active |
+| `PricingPage.tsx` | Public plan catalog | Active |
+| `PublicCarbonCalculator.tsx` | Public, non-persistent calculation sandbox | Active; clearly keep separate from audit ledger |
+| `AIAssistantModule.tsx` | Future AI placeholder | Active placeholder; no API connection |
+| `AssessmentForm.tsx` | Public assessment lead flow | Active |
+| `ServiceFirstFlow.tsx`, `SectorServicesFlow.tsx` | Public service catalog flows | Active, high complexity |
+| `CalculatedDashboard.tsx` | Service-flow example/dashboard | Active only through `SectorServicesFlow` |
+| `AsymmetricInfinityLogo.tsx` | Shared brand mark | Active |
+
+## Services, Hooks, Middleware, Context
+
+| Type | File | Purpose | Status |
+| --- | --- | --- | --- |
+| Client service | `src/services/apiClient.ts` | Session persistence, authenticated fetch, token refresh | Active |
+| Context | `src/contexts/AuthContext.tsx` | Client auth session and RBAC helpers | Active; App still duplicates some auth state |
+| Hook | `src/hooks/useSubscription.ts` | Subscription and usage retrieval | Active |
+| Hook | `src/hooks/useEntitlements.ts` | Entitlements, limits, license retrieval | Active |
+| Service | `server/carbonLedgerService.ts` | Registry lookup and immutable activity/calculation lineage | Active |
+| Service | `server/subscriptionService.ts` | Plan catalog, subscription change, usage | Active |
+| Service | `server/entitlementService.ts` | Effective plan/override limits, usage, license sync | Active |
+| Service | `server/services/foundationServices.ts` | Empty Phase 1 interfaces | Unused; refactor into real services or remove |
+| Middleware | `server/auth.ts` | Bearer auth and RBAC gates | Active |
+| Middleware | `server/middleware/entitlements.ts` | License, entitlement, and limit enforcement | Active |
+| Middleware | `errorHandler.ts`, `requestLogger.ts` | Errors and request IDs/logging | Active |
+| Middleware | `tenantResolution.ts`, `validateRequest.ts` | Optional helpers | Unused; adopt or remove |
+
+## File Catalog
+
+Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommendation**.
+
+### Root, deployment, and assets
+
+| File | Purpose | Depends on | Used by | Status | Complexity | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `.env.example` | Safe environment-variable template | Runtime config | Developers | Active | Low | Keep |
+| `.gitattributes` | Text normalization | Git | Git | Active | Low | Keep |
+| `.gitignore` | Ignore secrets/build artifacts | Git | Git | Active | Low | Keep |
+| `api/index.ts` | Vercel function entry | `server.ts` | Vercel | Active | Low | Keep |
+| `index.html` | Vite HTML shell | Vite assets | Browser | Active | Low | Keep |
+| `metadata.json` | Legacy AI Studio metadata | None | Tooling only | Deprecated | Low | Remove Gemini capability declaration or update |
+| `package.json` | Scripts/dependency manifest | npm | Tooling | Active | Low | Keep; remove unused Google AI dependency when confirmed |
+| `package-lock.json` | Locked dependency graph | npm | npm | Active | Low | Keep |
+| `README.md` | Product overview | Project | Developers | Active but stale | Medium | Update after audit |
+| `server.ts` | Express composition root | Routers, middleware, Vite | npm/Vercel | Active | Medium | Keep |
+| `tsconfig.json` | TypeScript settings | TypeScript | Tooling | Active | Low | Keep |
+| `vercel.json` | SPA/API rewrites | Vercel | Deployment | Active | Low | Keep |
+| `vite.config.ts` | React/Tailwind bundler config | Vite | Build | Active | Low | Keep |
+| `assets/.aistudio/.gitignore` | AI Studio artifact exclusion | Tooling | Tooling | Unused | Low | Remove if AI Studio is no longer used |
+| `public/Balancing.png` | Brand asset | Browser | Public UI | Active | Low | Keep |
+| `public/android-chrome-192x192.png`, `android-chrome-512x512.png`, `apple-touch-icon.png` | Device icons | Browser manifest | Browser | Active | Low | Keep |
+| `public/favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png` | Favicons | HTML/manifest | Browser | Active | Low | Keep |
+| `public/site.webmanifest` | PWA metadata | Browser | Browser | Active | Low | Keep |
+| `src/assets/images/balancing_logo_1783605819990.jpg` | Source logo asset | UI imports | Brand UI | Active | Low | Keep |
+
+### Frontend application
+
+| File | Purpose | Depends on | Used by | Status | Complexity | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/main.tsx` | React bootstrap and providers | `App`, `AuthProvider`, CSS | Vite | Active | Low | Keep |
+| `src/App.tsx` | Main routing/state/API orchestration | Components, API client, types | `main.tsx` | Active | High | Refactor into route/domain containers |
+| `src/index.css` | Tailwind/theme/global styles | Tailwind | All UI | Active | High | Keep; split tokens from page styles |
+| `src/types.ts` | Shared browser-domain types | Components | Frontend | Active | Medium | Keep |
+| `src/services/apiClient.ts` | Fetch/session implementation | Browser storage | App/hooks/components | Active | Medium | Keep |
+| `src/contexts/AuthContext.tsx` | Auth context/hooks | API client | `main.tsx`, future consumers | Active | Medium | Consolidate App auth state into it |
+| `src/hooks/useSubscription.ts` | Subscription hook | API client | Subscription settings | Active | Low | Keep |
+| `src/hooks/useEntitlements.ts` | License/entitlement hook | API client | Gates/settings | Active | Low | Keep |
+| `src/data/servicesData.ts` | Service catalog constants | Static content | Calculated dashboard | Active | Medium | Keep |
+| `src/data/servicesDataRedesign.ts` | Larger service catalog content | Static content | Service-first flow | Active | High | Move to CMS/data modules if it grows |
+| `src/components/AIAssistantModule.tsx` | Future AI placeholder | Static text | App | Placeholder | Medium | Keep disabled; do not connect API |
+| `src/components/AssessmentForm.tsx` | Public assessment form | React/types | App | Active | Medium | Keep |
+| `src/components/AsymmetricInfinityLogo.tsx` | Reusable logo | Image/CSS | Header/sidebar/login | Active | Low | Keep |
+| `src/components/CalculatedDashboard.tsx` | Service demo dashboard | Service data | Sector flow | Active | High | Keep isolated from tenant dashboard |
+| `src/components/CarbonEngineUI.tsx` | Scope explorer | Ledger types | App | Active | Medium | Keep |
+| `src/components/CarbonIntelligenceHub.tsx` | Phase 2 intelligence UI | Phase 2 types | App | Active | High | Split tabs into modules |
+| `src/components/DashboardOverview.tsx` | Tenant dashboard overview | Tenant data/types | App | Active | High | Keep; consume `/carbon-summary` next |
+| `src/components/DashboardSidebar.tsx` | Sidebar navigation | Logo/types | App | Active | Medium | Replace hardcoded tenant/menu metadata |
+| `src/components/DocumentCentre.tsx` | Evidence metadata UI | Document types | App | Active | Medium | Add real storage upload later |
+| `src/components/EnergyTracking.tsx` | Ledger input/table UI | Energy/production types | App | Active | High | Add registry factor/data-quality display |
+| `src/components/EntitlementGate.tsx` | Access-locked panel | Entitlement hook | App | Active | Low | Keep |
+| `src/components/ESGAssessmentModule.tsx` | ESG UI | ESG types | App | Active | High | Keep |
+| `src/components/FacilityManagement.tsx` | Facility UI | Facility types | App | Active | High | Add Phase 5 fields/archive controls |
+| `src/components/OEMQuestionnaireModule.tsx` | Questionnaire UI | OEM types | App | Active | High | Keep |
+| `src/components/PricingPage.tsx` | Pricing UI | API client | App | Active | Medium | Keep |
+| `src/components/PublicCarbonCalculator.tsx` | Public calculator | Static factors/UI | App | Active | High | Keep clearly marked sandbox |
+| `src/components/SectorServicesFlow.tsx` | Sector-first public flow | Service data/demo dashboard | App | Active | High | Keep |
+| `src/components/ServiceFirstFlow.tsx` | Service-first public flow | Redesign data | App | Active | High | Split data/rendering |
+| `src/components/SubscriptionSettings.tsx` | Subscription settings | Subscription/entitlement hooks | App | Active | Medium | Keep |
+
+### Backend core and services
+
+| File | Purpose | Depends on | Used by | Status | Complexity | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `server/auth.ts` | Auth middleware and profile lookup | Supabase, authorization | All protected routers | Active | Medium | Keep |
+| `server/authorization.ts` | RBAC context/audit events | Supabase | Auth/routes | Active | Medium | Keep |
+| `server/carbonAccounting.ts` | Deterministic engine and legacy prototype factor test fixture | Pure TypeScript | Energy ledger/tests | Active | High | Move prototypes to test fixture after registry migration |
+| `server/carbonLedgerService.ts` | DB factor resolution and lineage persistence | Engine/Supabase | Energy router | Active | Medium | Keep |
+| `server/config/runtime.ts` | Environment-backed settings | `process.env` | Server | Active | Low | Keep |
+| `server/db.ts` | Legacy in-memory/JSON seeded domain store | None | No runtime imports | Deprecated | Very high | Remove after data migration review |
+| `server/entitlementService.ts` | Effective licensing and limits | Supabase | Gates/subscriptions | Active | Medium | Keep |
+| `server/facilityAggregates.ts` | Recomputes facility ledger aggregates | Supabase | Energy router | Active | Medium | Keep |
+| `server/facilityCalculations.ts` | Legacy direct facility estimate | Prototype engine | No runtime imports | Unused | Low | Remove after confirming no external imports |
+| `server/intelligenceInputs.ts` | Loads scoped inputs for Phase 2 | Supabase | Intelligence router | Active | Medium | Keep |
+| `server/phase2CarbonIntelligence.ts` | Pure diagnostics/scenario calculations | Pure TS | Router/tests | Active | High | Keep |
+| `server/requestUtils.ts` | String/number validation helpers | None | Routers | Active | Low | Keep |
+| `server/rowMappers.ts` | Database-to-client mapping | Carbon helpers | Routers | Active | High | Split by domain |
+| `server/subscriptionService.ts` | Plans/subscription lifecycle | Supabase/entitlements | Subscription router | Active | Medium | Keep |
+| `server/supabase.ts` | Legacy optional Supabase client | dotenv | No runtime imports | Deprecated | Low | Remove or consolidate into clients |
+| `server/supabaseClients.ts` | Required admin/auth Supabase clients | Environment | Auth/services/routers | Active | Low | Keep |
+| `server/services/foundationServices.ts` | Placeholder classes | None | No runtime imports | Unused | Low | Remove or implement |
+| `server/carbonAccounting.test.ts` | Calculation unit tests | Carbon engine | npm test | Active | Medium | Keep |
+| `server/phase2CarbonIntelligence.test.ts` | Intelligence unit tests | Phase 2 engine | npm test | Active | Medium | Keep |
+
+### Routers and middleware
+
+| File | Purpose | Depends on | Used by | Status | Complexity | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `server/routes/authRoutes.ts` | Signup, login, profile, members, invitations | Auth/RBAC/Supabase/subscription | `server.ts` | Active | High | Split account and membership routes |
+| `server/routes/carbonAccountingRoutes.ts` | Activity lineage, review, summary APIs | Ledger/engine/Supabase | `server.ts` | Active | Medium | Keep |
+| `server/routes/complianceRoutes.ts` | ESG/OEM APIs | Entitlement middleware/Supabase | `server.ts` | Active | Medium | Keep |
+| `server/routes/energyRoutes.ts` | Ledger and factor APIs | Registry, lineage, aggregates | `server.ts` | Active | High | Keep; extract transaction service |
+| `server/routes/entitlementRoutes.ts` | Entitlement/license read APIs | Entitlement service | `server.ts` | Active | Low | Keep |
+| `server/routes/facilityRoutes.ts` | Facility CRUD/archive APIs | Limits/mappers/Supabase | `server.ts` | Active | High | Extract profile mapping/validation |
+| `server/routes/intelligenceRoutes.ts` | Diagnostics/projects APIs | Phase 2 engine | `server.ts` | Active | High | Split by resource |
+| `server/routes/organisationRoutes.ts` | Organisation profile API | RBAC/Supabase | `server.ts` | Active | Medium | Keep |
+| `server/routes/productionRoutes.ts` | Production/activity API | Supabase | `server.ts` | Active | Medium | Keep |
+| `server/routes/reportingRoutes.ts` | Documents/reports APIs | Limits/mappers | `server.ts` | Active | Medium | Keep |
+| `server/routes/subscriptionRoutes.ts` | Subscription endpoints | Subscription service | `server.ts` | Active | Low | Keep |
+| `server/middleware/entitlements.ts` | License/feature/limit gates | Entitlement service | Protected writes | Active | Medium | Keep |
+| `server/middleware/errorHandler.ts` | Final error response | Express | `server.ts` | Active | Low | Keep |
+| `server/middleware/requestLogger.ts` | Request ID/logging | Express | `server.ts` | Active | Low | Keep |
+| `server/middleware/tenantResolution.ts` | Optional tenant resolver | Auth/profile | No runtime mount | Unused | Low | Remove or mount consistently |
+| `server/middleware/validateRequest.ts` | Optional body validator | Express | No runtime imports | Unused | Low | Adopt for routers or remove |
+
+### Migrations and documentation
+
+| File | Purpose | Depends on | Used by | Status | Complexity | Recommendation |
+| --- | --- | --- | --- | --- | --- | --- |
+| `server/migrations/000_base_schema.sql` | Base tenant, ledger, ESG, evidence schema | Supabase Auth | All migrations/runtime | Active | High | Keep |
+| `001_activity_carbon_engine.sql` | Legacy activity engine and production schema | 000 | Ledger/runtime | Active | High | Keep |
+| `002_phase2_carbon_intelligence.sql` | Intelligence schema | 000/001 | Phase 2 router | Active | High | Keep |
+| `003_demo_seed.sql` | Optional demo tenant data | 000-002/auth user | Development only | Optional | High | Never use in production |
+| `004_enterprise_saas_foundation.sql` | RBAC/subscription foundation | 000 | 005-014 | Active | High | Keep; legacy tables noted above |
+| `005_authentication_authorization.sql` | RBAC/profile/invitation schema | 004 | Auth routes | Active | High | Keep |
+| `006_legacy_timestamp_repair.sql` | Compatibility repair | Existing legacy DB | Existing deployments | Conditional | Low | Keep; not needed on fresh DB |
+| `007_subscription_pricing.sql` | Plans/subscription schema and seeds | 004 | Subscription runtime | Active | High | Keep |
+| `008_plan_feature_inheritance.sql` | Tier feature inheritance | 007 | Pricing catalog | Active | Low | Keep |
+| `009_entitlement_engine.sql` | Entitlement/license tables | 007/008 | Phase 4 runtime | Active | High | Keep |
+| `010_carbon_accounting_foundation.sql` | Phase 5 profile/activity/factor schema | 000/001 | Phase 5 runtime | Active | High | Keep |
+| `011_reporting_compliance_foundation.sql` | Phase 6 schema foundation | 010 | No runtime router yet | Future | Medium | Do not apply unless intentionally preparing Phase 6 |
+| `012_phase3_pricing_finalization.sql` | INR three-plan catalog/archive Enterprise+ | 007/008 | Existing deployments | Active | Medium | Keep |
+| `013_phase4_feature_gate_enforcement.sql` | Effective plan mapping/license/usage backfill | 009/012 | Phase 4 runtime | Active | High | Keep |
+| `014_phase5_carbon_accounting_runtime.sql` | Factor registry seed and legacy lineage bridge | 010 | Phase 5 runtime | Active | Medium | Keep; approve factors per tenant |
+| `docs/ARCHITECTURE.md` | Phase 1 architecture record | Source tree | Developers | Active but stale | Medium | Refresh after this index |
+| `docs/SUBSCRIPTIONS.md` | Pricing/subscription guide | 007/008/012 | Developers | Active | Medium | Keep |
+| `docs/ENTITLEMENTS.md` | Phase 4 gates guide | 009/013 | Developers | Active | Medium | Keep |
+| `docs/CARBON_ACCOUNTING.md` | Phase 5 runtime guide | 010/014 | Developers | Active | Medium | Keep |
+| `docs/PRICING_RESEARCH.md` | Commercial pricing rationale | External sources | Product team | Active | Low | Refresh quarterly |
+| `docs/CODEBASE_INDEX.md` | This inventory | Source tree | Developers | Active | High | Update after major phase |
+
+## Known Disconnected or Future Pieces
+
+- `server/db.ts`, `server/supabase.ts`, `facilityCalculations.ts`, `foundationServices.ts`, `tenantResolution.ts`, and `validateRequest.ts` are not connected to the live runtime.
+- `CalculatedDashboard.tsx` is a public service-flow demo, not the authenticated tenant dashboard.
+- `011_reporting_compliance_foundation.sql` creates Phase 6 tables but no Phase 6 runtime API or UI yet.
+- Document uploads store metadata only; no Supabase Storage upload pipeline is implemented.
+- The AI module is intentionally a placeholder. `@google/genai` and `metadata.json` still advertise legacy AI Studio capability but no API key or server integration is active.
+- `App.tsx` is the primary maintainability hotspot. It mixes routing, auth state, API orchestration, and page composition.

@@ -4,6 +4,7 @@ import { type AuthenticatedRequest, getProfile, requireAuth, requirePermission }
 import { num, str } from '../requestUtils.js';
 import { mapOrganisation } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
+import { requireOperationalLicense } from '../middleware/entitlements.js';
 
 export function createOrganisationRouter() {
   const router = Router();
@@ -17,7 +18,7 @@ export function createOrganisationRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load organisation.' }); }
   });
 
-  router.post('/', requireAuth, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
+  router.post('/', requireAuth, requireOperationalLicense, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id);
       const b = req.body ?? {};
@@ -28,6 +29,8 @@ export function createOrganisationRouter() {
       if (b.employeeCount !== undefined) updates.employee_count = num(b.employeeCount);
       if (b.reportingYear !== undefined) updates.reporting_year = str(b.reportingYear);
       if (b.targetReductionPercent !== undefined) updates.target_reduction_percent = num(b.targetReductionPercent);
+      const extendedFields: [string, string][] = [['legalName','legal_name'],['subIndustry','sub_industry'],['country','country'],['state','state'],['city','city'],['currency','currency'],['timeZone','time_zone'],['fiscalYear','fiscal_year'],['baseYear','base_year'],['reportingFramework','reporting_framework'],['organizationBoundary','organization_boundary'],['operationalBoundary','operational_boundary'],['businessDescription','business_description'],['website','website'],['logoUrl','logo_url']];
+      for (const [input, column] of extendedFields) if (b[input] !== undefined) updates[column] = str(b[input]);
       const { data, error } = await supabaseAdmin.from('organisations').update(updates).eq('id', p.organisation_id).select('*').single();
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Update failed.' });
       res.json(mapOrganisation(data));

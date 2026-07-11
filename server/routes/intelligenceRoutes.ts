@@ -7,6 +7,7 @@ import { calculateDataCompleteness, calculateExpectedVsObserved, calculateReduct
 import { optionalFinite, requiredFinite, str } from '../requestUtils.js';
 import { mapDiagnosticResponse, mapMeasurement, mapMilestone, mapOpportunity, mapProject, mapScenario } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
+import { requireEntitlement, requireOperationalLicense } from '../middleware/entitlements.js';
 
 /** Phase 2 intelligence endpoints. Mounted at /api to preserve public URLs. */
 export function createIntelligenceRouter() {
@@ -25,7 +26,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load diagnostic responses.' }); }
   });
 
-  router.post('/diagnostic-responses', requireAuth, requirePermission('activity.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/diagnostic-responses', requireAuth, requireOperationalLicense, requirePermission('activity.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const questionId = str(b.questionId, b.question_id);
@@ -77,7 +78,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load opportunities.' }); }
   });
 
-  router.post('/opportunities', requireAuth, requirePermission('project.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/opportunities', requireAuth, requireOperationalLicense, requirePermission('project.create'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const facilityId = str(b.facilityId, b.facility_id) || null;
@@ -102,7 +103,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create opportunity.' }); }
   });
 
-  router.patch('/opportunities/:id', requireAuth, requirePermission('project.edit'), async (req: AuthenticatedRequest, res) => {
+  router.patch('/opportunities/:id', requireAuth, requireOperationalLicense, requirePermission('project.edit'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const updates: any = { updated_at: new Date().toISOString() };
@@ -124,7 +125,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load scenarios.' }); }
   });
 
-  router.post('/scenarios', requireAuth, requirePermission('project.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/scenarios', requireAuth, requireOperationalLicense, requirePermission('project.create'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const facilityId = str(b.facilityId, b.facility_id) || null;
@@ -157,7 +158,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load projects.' }); }
   });
 
-  router.post('/projects', requireAuth, requirePermission('project.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/projects', requireAuth, requireOperationalLicense, requirePermission('project.create'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const facilityId = str(b.facilityId, b.facility_id) || null, opportunityId = str(b.opportunityId, b.opportunity_id) || null, scenarioId = str(b.scenarioId, b.scenario_id) || null;
@@ -180,7 +181,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create project.' }); }
   });
 
-  router.post('/projects/:id/milestones', requireAuth, requirePermission('project.edit'), async (req: AuthenticatedRequest, res) => {
+  router.post('/projects/:id/milestones', requireAuth, requireOperationalLicense, requirePermission('project.edit'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const { data: project } = await supabaseAdmin.from('decarbonization_projects').select('id').eq('id', req.params.id).eq('organisation_id', p.organisation_id).single();
@@ -194,7 +195,7 @@ export function createIntelligenceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create milestone.' }); }
   });
 
-  router.post('/projects/:id/measurements', requireAuth, requirePermission('project.edit'), async (req: AuthenticatedRequest, res) => {
+  router.post('/projects/:id/measurements', requireAuth, requireOperationalLicense, requirePermission('project.edit'), requireEntitlement('projects.create'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const { data: project } = await supabaseAdmin.from('decarbonization_projects').select('id').eq('id', req.params.id).eq('organisation_id', p.organisation_id).single();

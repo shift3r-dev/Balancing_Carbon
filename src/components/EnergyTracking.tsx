@@ -13,18 +13,18 @@ interface EnergyProps {
 }
 
 const SOURCE_OPTIONS = [
-  { sourceType: 'Grid Electricity', activityType: 'electricity', unit: 'kWh', scope: 'scope-2', factor: 0.716, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'On-site Solar', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'On-site Wind', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2', factor: 0, factorUnit: 'kgCO2e/kWh' },
-  { sourceType: 'Diesel', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 2.68, factorUnit: 'kgCO2e/litre' },
-  { sourceType: 'Petrol', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 2.31, factorUnit: 'kgCO2e/litre' },
-  { sourceType: 'LPG', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 1.51, factorUnit: 'kgCO2e/litre' },
-  { sourceType: 'Natural Gas', activityType: 'fuel', unit: 'SCM', scope: 'scope-1', factor: 2.02, factorUnit: 'kgCO2e/SCM' },
-  { sourceType: 'Furnace Oil', activityType: 'fuel', unit: 'litre', scope: 'scope-1', factor: 3.15, factorUnit: 'kgCO2e/litre' },
-  { sourceType: 'Biomass', activityType: 'fuel', unit: 'kg', scope: 'scope-1', factor: 0.05, factorUnit: 'kgCO2e/kg' },
-  { sourceType: 'Coal', activityType: 'fuel', unit: 'kg', scope: 'scope-1', factor: 2.42, factorUnit: 'kgCO2e/kg' },
-  { sourceType: 'Purchased Steam', activityType: 'steam', unit: 'kg', scope: 'scope-2', factor: 0.184, factorUnit: 'kgCO2e/kg' },
-  { sourceType: 'Purchased Heat', activityType: 'heat', unit: 'kWh', scope: 'scope-2', factor: 0.184, factorUnit: 'kgCO2e/kWh' },
+  { sourceType: 'Grid Electricity', activityType: 'electricity', unit: 'kWh', scope: 'scope-2' },
+  { sourceType: 'On-site Solar', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2' },
+  { sourceType: 'On-site Wind', activityType: 'renewable-electricity', unit: 'kWh', scope: 'scope-2' },
+  { sourceType: 'Diesel', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
+  { sourceType: 'Petrol', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
+  { sourceType: 'LPG', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
+  { sourceType: 'Natural Gas', activityType: 'fuel', unit: 'SCM', scope: 'scope-1' },
+  { sourceType: 'Furnace Oil', activityType: 'fuel', unit: 'litre', scope: 'scope-1' },
+  { sourceType: 'Biomass', activityType: 'fuel', unit: 'kg', scope: 'scope-1' },
+  { sourceType: 'Coal', activityType: 'fuel', unit: 'kg', scope: 'scope-1' },
+  { sourceType: 'Purchased Steam', activityType: 'steam', unit: 'kg', scope: 'scope-2' },
+  { sourceType: 'Purchased Heat', activityType: 'heat', unit: 'kWh', scope: 'scope-2' },
 ] as const;
 
 export default function EnergyTracking({
@@ -62,10 +62,6 @@ export default function EnergyTracking({
   const [filterDateTo, setFilterDateTo] = useState('');
 
   const selectedSource = SOURCE_OPTIONS.find((option) => option.sourceType === sourceType) ?? SOURCE_OPTIONS[0];
-  const parsedQuantity = Number(quantity);
-  const previewEmissions = Number.isFinite(parsedQuantity) && parsedQuantity >= 0
-    ? (parsedQuantity * selectedSource.factor) / 1000
-    : null;
 
   const handleSourceChange = (nextSourceType: string) => {
     const next = SOURCE_OPTIONS.find((option) => option.sourceType === nextSourceType) ?? SOURCE_OPTIONS[0];
@@ -100,8 +96,8 @@ export default function EnergyTracking({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!facilityId || !sourceType || !quantity) {
-      alert('Please enter required activity details.');
+    if (!facilityId || !sourceType || !quantity || !sourceDocument.trim()) {
+      alert('Please enter activity details and an evidence reference.');
       return;
     }
 
@@ -114,7 +110,7 @@ export default function EnergyTracking({
       energyType: sourceType,
       quantity: Number(quantity),
       unit,
-      sourceDocument: sourceDocument || 'Manual Entry',
+      sourceDocument,
       notes,
     };
 
@@ -244,8 +240,8 @@ export default function EnergyTracking({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Evidence Document (Optional)</label>
-                  <input type="text" placeholder="e.g. IOCL_Invoice_778.pdf" value={sourceDocument} onChange={(e) => setSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+                  <label className="block font-mono text-gray-500 mb-1">Evidence Reference *</label>
+                  <input type="text" required placeholder="e.g. IOCL_Invoice_778.pdf" value={sourceDocument} onChange={(e) => setSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
                 </div>
                 <div>
                   <label className="block font-mono text-gray-500 mb-1">Internal Notes</label>
@@ -253,20 +249,7 @@ export default function EnergyTracking({
                 </div>
               </div>
 
-              {previewEmissions !== null && (
-                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono text-brand-forest">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-brand-green-sec block">Deterministic Emission Preview</span>
-                    <p className="mt-1">
-                      {quantity || 0} {unit} x {selectedSource.factor} {selectedSource.factorUnit} = <strong>{previewEmissions.toFixed(4)} tCO2e</strong>
-                    </p>
-                  </div>
-                  <div className="text-left sm:text-right text-brand-charcoal">
-                    <span className="text-[10px] text-gray-400 block">Scope Classification</span>
-                    <span className="font-bold">{selectedSource.scope === 'scope-2' ? 'Scope 2 Location-Based' : 'Scope 1 Direct'}</span>
-                  </div>
-                </div>
-              )}
+              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono text-brand-forest"><div><span className="text-[10px] uppercase font-bold tracking-wider text-brand-green-sec block">Registry-backed calculation</span><p className="mt-1">An active versioned emission factor will be selected and recorded when this activity is saved.</p></div><div className="text-left sm:text-right text-brand-charcoal"><span className="text-[10px] text-gray-400 block">Scope Classification</span><span className="font-bold">{selectedSource.scope === 'scope-2' ? 'Scope 2 Location-Based' : 'Scope 1 Direct'}</span></div></div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={resetActivityForm} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-all cursor-pointer">

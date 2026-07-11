@@ -1,9 +1,12 @@
-import { deriveActivityType, resolveEmissionFactor } from './carbonAccounting.js';
+import { deriveActivityType } from './carbonAccounting.js';
 
 export const mapOrganisation = (o: any) => ({
   id: o.id, name: o.name ?? '', industry: o.industry ?? '', location: o.location ?? '',
   employeeCount: Number(o.employee_count ?? 0), reportingYear: o.reporting_year ?? '',
   targetReductionPercent: Number(o.target_reduction_percent ?? 0),
+  legalName: o.legal_name ?? '', subIndustry: o.sub_industry ?? '', country: o.country ?? 'India', state: o.state ?? '', city: o.city ?? '',
+  currency: o.currency ?? 'INR', timeZone: o.time_zone ?? 'Asia/Kolkata', fiscalYear: o.fiscal_year ?? '', baseYear: o.base_year ?? '',
+  reportingFramework: o.reporting_framework ?? '', organizationBoundary: o.organization_boundary ?? '', operationalBoundary: o.operational_boundary ?? '', businessDescription: o.business_description ?? '', website: o.website ?? '', logoUrl: o.logo_url ?? '',
 });
 
 export const mapFacility = (f: any) => ({
@@ -16,6 +19,8 @@ export const mapFacility = (f: any) => ({
   emissionsScope1: Number(f.emissions_scope_1 ?? 0), emissionsScope2: Number(f.emissions_scope_2 ?? 0),
   carbonIntensity: Number(f.carbon_intensity ?? 0),
   esgReadinessStatus: f.esg_readiness_status ?? 'Needs Improvement',
+  facilityCode: f.facility_code ?? '', plantType: f.plant_type ?? '', businessUnit: f.business_unit ?? '', address: f.address ?? '', country: f.country ?? 'India',
+  latitude: f.latitude === null || f.latitude === undefined ? null : Number(f.latitude), longitude: f.longitude === null || f.longitude === undefined ? null : Number(f.longitude), operationalStatus: f.operational_status ?? 'active', operatingHours: f.operating_hours === null || f.operating_hours === undefined ? null : Number(f.operating_hours), commissionDate: f.commission_date ?? '', primaryProducts: f.primary_products ?? '', managerName: f.manager_name ?? '', reportingBoundary: f.reporting_boundary ?? '', archivedAt: f.archived_at ?? null,
 });
 
 export const mapEnergyRecord = (r: any) => ({
@@ -29,7 +34,7 @@ export const mapEnergyRecord = (r: any) => ({
   energyType: r.energy_type ?? r.source_type,
   quantity: Number(r.quantity ?? 0),
   unit: r.unit ?? '',
-  scope: r.scope ?? (resolveEmissionFactor(r.source_type ?? r.energy_type ?? '')?.scope ?? 'scope-1'),
+  scope: r.scope ?? 'scope-1',
   emissionFactorId: r.emission_factor_id ?? r.audit_trail?.emissionFactorId ?? '',
   emissionFactorValue: Number(r.emission_factor_value ?? r.audit_trail?.emissionFactor ?? 0),
   emissionFactorUnit: r.emission_factor_unit ?? r.audit_trail?.factorUnit ?? '',

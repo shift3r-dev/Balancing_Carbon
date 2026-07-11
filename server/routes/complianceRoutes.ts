@@ -5,6 +5,7 @@ import { type AuthenticatedRequest, getProfile, requireAuth, requirePermission }
 import { num, str } from '../requestUtils.js';
 import { mapESGQuestion, mapOEMQuestionnaire } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
+import { requireEntitlement, requireOperationalLicense } from '../middleware/entitlements.js';
 
 /** ESG and OEM compliance endpoints. Mounted at /api to preserve public URLs. */
 export function createComplianceRouter() {
@@ -19,7 +20,7 @@ export function createComplianceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load ESG questions.' }); }
   });
 
-  router.put('/esg/:id', requireAuth, requirePermission('project.edit'), async (req: AuthenticatedRequest, res) => {
+  router.put('/esg/:id', requireAuth, requireOperationalLicense, requirePermission('project.edit'), requireEntitlement('compliance.manage'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const updates: any = {};
@@ -47,7 +48,7 @@ export function createComplianceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load OEM surveys.' }); }
   });
 
-  router.post('/oem-surveys', requireAuth, requirePermission('project.create'), async (req: AuthenticatedRequest, res) => {
+  router.post('/oem-surveys', requireAuth, requireOperationalLicense, requirePermission('project.create'), requireEntitlement('compliance.manage'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const title = str(b.title), oemName = str(b.oemName, b.oem_name), dueDate = str(b.dueDate, b.due_date);
@@ -68,7 +69,7 @@ export function createComplianceRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create OEM survey.' }); }
   });
 
-  router.post('/oem-surveys/:id/approve-question', requireAuth, requirePermission('project.edit'), async (req: AuthenticatedRequest, res) => {
+  router.post('/oem-surveys/:id/approve-question', requireAuth, requireOperationalLicense, requirePermission('project.edit'), requireEntitlement('compliance.manage'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const questionId = str(b.questionId, b.question_id);

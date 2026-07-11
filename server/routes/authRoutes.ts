@@ -3,19 +3,35 @@ import { randomUUID } from 'node:crypto';
 
 import { type AuthenticatedRequest, getProfile, requireAuth, requirePermission } from '../auth.js';
 import { auditAuthEvent } from '../authorization.js';
+import { syncLicenseFromSubscription, syncUsage } from '../entitlementService.js';
+import { requireEntitlement, requireLimit, requireOperationalLicense } from '../middleware/entitlements.js';
 import { str } from '../requestUtils.js';
 import { mapOrganisation } from '../rowMappers.js';
 import { supabaseAdmin, supabaseAuth } from '../supabaseClients.js';
 
 export function createAuthRouter() {
   const router = Router();
+  const userUsage = async (organisationId: string) => {
+    const [{ count: members, error: memberError }, { count: invitations, error: invitationError }] = await Promise.all([
+      supabaseAdmin.from('organization_members').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId).is('deleted_at', null),
+      supabaseAdmin.from('organization_invitations').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId).eq('status', 'pending').is('deleted_at', null),
+    ]);
+    if (memberError || invitationError) throw new Error(memberError?.message ?? invitationError?.message);
+    return (members ?? 0) + (invitations ?? 0);
+  };
 
   router.post('/signup', async (req, res) => {
     let userId: string | null = null, orgId: string | null = null;
     try {
       const { name, email, password, organisationName } = req.body ?? {};
+      const planId = str(req.body?.planId, req.body?.plan_id) || 'plan-starter';
+      const billingInterval = req.body?.billingInterval ?? req.body?.billing_interval ?? 'monthly';
       if (!str(name) || !str(email) || !str(organisationName) || typeof password !== 'string' || password.length < 8)
         return res.status(400).json({ error: 'Name, valid email, organisation name, and password of at least 8 characters are required.' });
+      if (billingInterval !== 'monthly' && billingInterval !== 'yearly') return res.status(400).json({ error: 'Billing interval must be monthly or yearly.' });
+
+      const { data: selectedPlan, error: planError } = await supabaseAdmin.from('plans').select('id, trial_days').eq('id', planId).eq('active', true).is('deleted_at', null).maybeSingle();
+      if (planError || !selectedPlan) return res.status(400).json({ error: 'The selected plan is not available.' });
 
       const normalizedEmail = str(email).toLowerCase();
       const { data: auth, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -39,6 +55,17 @@ export function createAuthRouter() {
       if (membershipError) throw new Error(`Membership creation failed: ${membershipError.message}`);
       const { error: roleError } = await supabaseAdmin.from('user_roles').insert({ id: `user-role-${randomUUID()}`, user_id: userId, role_id: 'role-organisation-admin', organisation_id: orgId });
       if (roleError) throw new Error(`Role assignment failed: ${roleError.message}`);
+
+      const startedAt = new Date();
+      const trialEndsAt = new Date(startedAt.getTime() + Number(selectedPlan.trial_days ?? 14) * 86400000);
+      const subscriptionId = `sub-${randomUUID()}`;
+      const { error: subscriptionError } = await supabaseAdmin.from('subscriptions').insert({
+        id: subscriptionId, organisation_id: orgId, plan_id: selectedPlan.id, status: 'trial', billing_interval: billingInterval,
+        started_at: startedAt.toISOString(), trial_ends_at: trialEndsAt.toISOString(), renewal_at: trialEndsAt.toISOString(),
+        metadata: { source: 'signup', payment_status: 'not-connected' },
+      });
+      if (subscriptionError) throw new Error(`Subscription provisioning failed: ${subscriptionError.message}`);
+      await syncLicenseFromSubscription(orgId, { id: subscriptionId, status: 'trial', startedAt: startedAt.toISOString(), expiresAt: null });
 
       const { data: session, error: sessionError } = await supabaseAuth.auth.signInWithPassword({ email: normalizedEmail, password });
       if (sessionError || !session.session) throw new Error(`Automatic login failed: ${sessionError?.message ?? 'no session'}`);
@@ -79,7 +106,17 @@ export function createAuthRouter() {
 
   router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const p = await getProfile(req.authUser!.id);
-    res.json({ authenticated: true, user: { id: p.id, name: p.full_name, email: req.authUser!.email, role: p.role, organisationId: p.organisation_id }, authorization: req.authorization });
+    res.json({ authenticated: true, user: { id: p.id, name: p.full_name, email: req.authUser!.email, role: p.role, organisationId: p.organisation_id, avatarUrl: (p as any).avatar_url ?? '', department: (p as any).department ?? '', designation: (p as any).designation ?? '', phone: (p as any).phone ?? '', timeZone: (p as any).time_zone ?? '', language: (p as any).language ?? '', status: (p as any).status ?? 'active', lastLoginAt: (p as any).last_login_at ?? null }, authorization: req.authorization });
+  });
+
+  router.patch('/profile', requireAuth, async (req: AuthenticatedRequest, res) => {
+    const body = req.body ?? {}; const updates: any = {};
+    const fields: [string, string][] = [['name','full_name'],['avatarUrl','avatar_url'],['department','department'],['designation','designation'],['phone','phone'],['timeZone','time_zone'],['language','language']];
+    for (const [input, column] of fields) if (body[input] !== undefined) updates[column] = str(body[input]);
+    const { data, error } = await supabaseAdmin.from('profiles').update(updates).eq('id', req.authUser!.id).select('*').single();
+    if (error || !data) return res.status(400).json({ error: error?.message ?? 'Unable to update profile.' });
+    await auditAuthEvent({ userId: req.authUser!.id, organisationId: req.authorization!.organisationId, eventType: 'profile_updated' });
+    res.json({ success: true, profile: data });
   });
 
   router.get('/permissions', requireAuth, (req: AuthenticatedRequest, res) => res.json({ permissions: req.authorization?.permissions ?? [] }));
@@ -114,24 +151,64 @@ export function createAuthRouter() {
     res.json({ success: true });
   });
 
+  router.post('/password-update', requireAuth, async (req: AuthenticatedRequest, res) => {
+    const password = req.body?.password;
+    if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(req.authUser!.id, { password });
+    if (error) return res.status(400).json({ error: error.message });
+    await auditAuthEvent({ userId: req.authUser!.id, organisationId: req.authorization!.organisationId, eventType: 'password_updated', ipAddress: req.ip, userAgent: req.get('user-agent') });
+    res.json({ success: true });
+  });
+
   router.get('/memberships', requireAuth, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
     const { data, error } = await supabaseAdmin.from('organization_members').select('id, user_id, role_id, created_at, deleted_at, roles(name)').eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ memberships: data ?? [] });
   });
 
-  router.get('/audit-events', requireAuth, requirePermission('audit.view'), async (req: AuthenticatedRequest, res) => {
+  router.get('/role-catalog', requireAuth, requirePermission('organization.manage'), async (_req, res) => {
+    const { data, error } = await supabaseAdmin.from('roles').select('id,name,description').is('deleted_at', null).order('name');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ roles: data ?? [] });
+  });
+
+  router.patch('/memberships/:id', requireAuth, requireOperationalLicense, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
+    const roleId = str(req.body?.roleId, req.body?.role_id);
+    if (!roleId) return res.status(400).json({ error: 'Role is required.' });
+    const { data: membership, error: membershipError } = await supabaseAdmin.from('organization_members').select('user_id').eq('id', req.params.id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null).single();
+    if (membershipError || !membership) return res.status(404).json({ error: 'Membership not found.' });
+    const { error } = await supabaseAdmin.from('organization_members').update({ role_id: roleId }).eq('id', req.params.id);
+    if (error) return res.status(400).json({ error: error.message });
+    await supabaseAdmin.from('user_roles').update({ deleted_at: new Date().toISOString() }).eq('user_id', membership.user_id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null);
+    await supabaseAdmin.from('user_roles').insert({ id: `user-role-${randomUUID()}`, user_id: membership.user_id, role_id: roleId, organisation_id: req.authorization!.organisationId });
+    await auditAuthEvent({ userId: req.authUser!.id, organisationId: req.authorization!.organisationId, eventType: 'role_changed', metadata: { membershipId: req.params.id, roleId } });
+    res.json({ success: true });
+  });
+
+  router.delete('/memberships/:id', requireAuth, requireOperationalLicense, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
+    const { data: membership, error: lookupError } = await supabaseAdmin.from('organization_members').select('user_id').eq('id', req.params.id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null).single();
+    if (lookupError || !membership) return res.status(404).json({ error: 'Membership not found.' });
+    if (membership.user_id === req.authUser!.id) return res.status(400).json({ error: 'You cannot remove your own membership.' });
+    await supabaseAdmin.from('organization_members').update({ deleted_at: new Date().toISOString() }).eq('id', req.params.id);
+    await supabaseAdmin.from('user_roles').update({ deleted_at: new Date().toISOString() }).eq('user_id', membership.user_id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null);
+    await auditAuthEvent({ userId: req.authUser!.id, organisationId: req.authorization!.organisationId, eventType: 'member_removed', metadata: { membershipId: req.params.id } });
+    await syncUsage(req.authorization!.organisationId, 'users', await userUsage(req.authorization!.organisationId));
+    res.json({ success: true });
+  });
+
+  router.get('/audit-events', requireAuth, requirePermission('audit.view'), requireEntitlement('security.audit_logs'), async (req: AuthenticatedRequest, res) => {
     const { data, error } = await supabaseAdmin.from('auth_events').select('*').eq('organisation_id', req.authorization!.organisationId).order('created_at', { ascending: false }).limit(100);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ events: data ?? [] });
   });
 
-  router.post('/invitations', requireAuth, requirePermission('organization.manage'), async (req: AuthenticatedRequest, res) => {
+  router.post('/invitations', requireAuth, requireOperationalLicense, requirePermission('organization.manage'), requireLimit('users', userUsage), async (req: AuthenticatedRequest, res) => {
     const email = str(req.body?.email).toLowerCase(), roleId = str(req.body?.roleId, req.body?.role_id);
     if (!email || !roleId) return res.status(400).json({ error: 'Email and role are required.' });
     const row = { id: `invite-${randomUUID()}`, organisation_id: req.authorization!.organisationId, email, role_id: roleId, invited_by: req.authUser!.id, expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() };
     const { data, error } = await supabaseAdmin.from('organization_invitations').insert(row).select('*').single();
     if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create invitation.' });
+    await syncUsage(req.authorization!.organisationId, 'users', await userUsage(req.authorization!.organisationId));
     await auditAuthEvent({ userId: req.authUser!.id, organisationId: req.authorization!.organisationId, eventType: 'invite_created', metadata: { invitationId: data.id, email } });
     res.status(201).json({ success: true, invitation: data });
   });

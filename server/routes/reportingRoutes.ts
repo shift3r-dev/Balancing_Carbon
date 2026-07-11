@@ -5,6 +5,16 @@ import { type AuthenticatedRequest, getProfile, requireAuth, requirePermission }
 import { str } from '../requestUtils.js';
 import { mapDocument, mapReport } from '../rowMappers.js';
 import { supabaseAdmin } from '../supabaseClients.js';
+import { syncUsage } from '../entitlementService.js';
+import { requireEntitlement, requireLimit, requireOperationalLicense } from '../middleware/entitlements.js';
+
+async function monthlyReportUsage(organisationId: string) {
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1); startOfMonth.setUTCHours(0, 0, 0, 0);
+  const { count, error } = await supabaseAdmin.from('reports').select('*', { count: 'exact', head: true }).eq('organisation_id', organisationId).gte('created_at', startOfMonth.toISOString());
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
 
 /** Document evidence and report endpoints. Mounted at /api to preserve public URLs. */
 export function createReportingRouter() {
@@ -19,7 +29,7 @@ export function createReportingRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load documents.' }); }
   });
 
-  router.post('/documents', requireAuth, requirePermission('document.upload'), async (req: AuthenticatedRequest, res) => {
+  router.post('/documents', requireAuth, requireOperationalLicense, requirePermission('document.upload'), requireEntitlement('documents.upload'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const name = str(b.name);
@@ -36,7 +46,7 @@ export function createReportingRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create document.' }); }
   });
 
-  router.delete('/documents/:id', requireAuth, requirePermission('document.delete'), async (req: AuthenticatedRequest, res) => {
+  router.delete('/documents/:id', requireAuth, requireOperationalLicense, requirePermission('document.delete'), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id);
       const { data, error } = await supabaseAdmin.from('documents').delete().eq('id', req.params.id).eq('organisation_id', p.organisation_id).select('id').maybeSingle();
@@ -55,7 +65,7 @@ export function createReportingRouter() {
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load reports.' }); }
   });
 
-  router.post('/reports', requireAuth, requirePermission('report.generate'), async (req: AuthenticatedRequest, res) => {
+  router.post('/reports', requireAuth, requireOperationalLicense, requirePermission('report.generate'), requireEntitlement('reports.generate'), requireLimit('reports_month', monthlyReportUsage), async (req: AuthenticatedRequest, res) => {
     try {
       const p = await getProfile(req.authUser!.id), b = req.body ?? {};
       const title = str(b.title);
@@ -67,6 +77,7 @@ export function createReportingRouter() {
       };
       const { data, error } = await supabaseAdmin.from('reports').insert(row).select('*').single();
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create report.' });
+      await syncUsage(p.organisation_id, 'reports_month', await monthlyReportUsage(p.organisation_id));
       res.status(201).json({ success: true, report: mapReport(data) });
     } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create report.' }); }
   });

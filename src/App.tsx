@@ -41,6 +41,7 @@ import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
 import DocumentCentre from "./components/DocumentCentre.tsx";
 import AIAssistantModule from "./components/AIAssistantModule.tsx";
 import SubscriptionSettings from "./components/SubscriptionSettings.tsx";
+import EntitlementGate from "./components/EntitlementGate.tsx";
 import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
 const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
@@ -97,15 +98,19 @@ export default function App() {
 
   // Login & Signup credentials states
   const [isSignUpMode, setIsSignUpMode] = useState(false);
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [passwordResetMessage, setPasswordResetMessage] = useState("");
 
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupOrgName, setSignupOrgName] = useState("");
   const [signupError, setSignupError] = useState("");
+  const [signupPlanId, setSignupPlanId] = useState("plan-starter");
+  const [signupBillingInterval, setSignupBillingInterval] = useState<"monthly" | "yearly">("monthly");
 
   // Core business models synced from backend
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
@@ -665,6 +670,8 @@ export default function App() {
           email: signupEmail,
           password: signupPassword,
           organisationName: signupOrgName,
+          planId: signupPlanId,
+          billingInterval: signupBillingInterval,
         }),
       });
 
@@ -691,6 +698,19 @@ export default function App() {
       console.error(err);
       setSignupError("Server connection error. Please try again.");
     }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setPasswordResetMessage("");
+    if (!loginEmail) { setLoginError("Enter your corporate email address."); return; }
+    try {
+      const response = await fetch("/api/auth/password-reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: loginEmail }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { setLoginError(data.error || "Unable to request password reset."); return; }
+      setPasswordResetMessage("If this account exists, a password reset link has been sent.");
+    } catch { setLoginError("Server connection error. Please try again."); }
   };
 
   // Log out
@@ -1157,39 +1177,33 @@ export default function App() {
                   />
                 )}
                 {currentView === "dashboard-intelligence" && (
-                  <Suspense fallback={<DashboardModuleLoader label="Loading Carbon Intelligence..." />}>
-                    <CarbonIntelligenceHub
-                      facilities={facilities}
-                      findings={diagnosticFindings}
-                      completeness={diagnosticCompleteness}
-                      comparison={diagnosticComparison}
-                      diagnosticResponses={diagnosticResponses}
-                      opportunities={opportunities}
-                      scenarios={scenarios}
-                      projects={projects}
-                      onRefreshDiagnostics={handleRefreshDiagnostics}
-                      onSaveDiagnosticResponse={handleSaveDiagnosticResponse}
-                      onCreateOpportunity={handleCreateOpportunity}
-                      onCreateScenario={handleCreateScenario}
-                      onCreateProject={handleCreateProject}
-                    />
-                  </Suspense>
+                  <EntitlementGate entitlement="projects.create" title="Carbon Intelligence">
+                    <Suspense fallback={<DashboardModuleLoader label="Loading Carbon Intelligence..." />}>
+                      <CarbonIntelligenceHub
+                        facilities={facilities}
+                        findings={diagnosticFindings}
+                        completeness={diagnosticCompleteness}
+                        comparison={diagnosticComparison}
+                        diagnosticResponses={diagnosticResponses}
+                        opportunities={opportunities}
+                        scenarios={scenarios}
+                        projects={projects}
+                        onRefreshDiagnostics={handleRefreshDiagnostics}
+                        onSaveDiagnosticResponse={handleSaveDiagnosticResponse}
+                        onCreateOpportunity={handleCreateOpportunity}
+                        onCreateScenario={handleCreateScenario}
+                        onCreateProject={handleCreateProject}
+                      />
+                    </Suspense>
+                  </EntitlementGate>
                 )}
 
                 {/* ESG & Surveys */}
                 {currentView === "dashboard-esg" && (
-                  <ESGAssessmentModule
-                    questions={esgQuestions}
-                    onUpdateQuestion={handleUpdateQuestion}
-                    documents={documents}
-                  />
+                  <EntitlementGate entitlement="compliance.manage" title="Compliance Workflows"><ESGAssessmentModule questions={esgQuestions} onUpdateQuestion={handleUpdateQuestion} documents={documents} /></EntitlementGate>
                 )}
                 {currentView === "dashboard-questionnaires" && (
-                  <OEMQuestionnaireModule
-                    surveys={oemSurveys}
-                    onAddSurvey={handleAddSurvey}
-                    onApproveQuestion={handleApproveOEMQuestion}
-                  />
+                  <EntitlementGate entitlement="compliance.manage" title="OEM Workflows"><OEMQuestionnaireModule surveys={oemSurveys} onAddSurvey={handleAddSurvey} onApproveQuestion={handleApproveOEMQuestion} /></EntitlementGate>
                 )}
 
                 {/* Documents & Reports */}
@@ -1758,7 +1772,7 @@ export default function App() {
 
         {currentView === "pricing" && (
           <Suspense fallback={<DashboardModuleLoader label="Loading pricing..." />}>
-            <PricingPage onStart={() => { setIsSignUpMode(true); setCurrentView("login"); }} />
+            <PricingPage onStart={(planId, billingInterval) => { setSignupPlanId(planId); setSignupBillingInterval(billingInterval); setIsSignUpMode(true); setCurrentView("login"); }} />
           </Suspense>
         )}
 
@@ -1851,19 +1865,19 @@ export default function App() {
               <div className="text-center space-y-1">
                 <AsymmetricInfinityLogo size="md" className="mx-auto" />
                 <h2 className="text-lg font-bold text-brand-charcoal font-mono uppercase tracking-wider pt-2">
-                  {isSignUpMode
+                  {isForgotPasswordMode ? "Reset Password" : isSignUpMode
                     ? "Register Corporate Account"
                     : "Client Login Portal"}
                 </h2>
                 <p className="text-[11px] text-gray-400 font-mono">
-                  {isSignUpMode
+                  {isForgotPasswordMode ? "Secure account recovery" : isSignUpMode
                     ? "Provision Isolated B2B Tenant"
                     : "Multi-Tenant Isolated Environment"}
                 </p>
               </div>
 
               {/* Login Error Alert */}
-              {!isSignUpMode && loginError && (
+               {!isSignUpMode && loginError && (
                 <div className="p-3 bg-red-50 border border-brand-red/20 text-brand-red text-xs rounded font-mono">
                   {loginError}
                 </div>
@@ -1876,7 +1890,14 @@ export default function App() {
                 </div>
               )}
 
-              {!isSignUpMode ? (
+               {isForgotPasswordMode ? (
+                 <form onSubmit={handlePasswordReset} className="space-y-4 text-xs">
+                   <div><label className="block text-gray-500 font-mono mb-1">Corporate Email Address</label><input type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono focus:outline-none focus:ring-1 focus:ring-brand-forest" /></div>
+                   {passwordResetMessage && <div className="p-3 bg-brand-sage/20 border border-brand-sage text-brand-forest text-xs rounded font-mono">{passwordResetMessage}</div>}
+                   <button type="submit" className="w-full bg-brand-charcoal hover:bg-black text-white py-2.5 rounded font-mono font-bold text-xs">Send Reset Link</button>
+                   <button type="button" onClick={() => { setIsForgotPasswordMode(false); setPasswordResetMessage(""); setLoginError(""); }} className="w-full text-brand-forest font-bold">Return to login</button>
+                 </form>
+               ) : !isSignUpMode ? (
                 /* Login Form */
                 <form onSubmit={handleFormLogin} className="space-y-4 text-xs">
                   <div>
@@ -1907,14 +1928,15 @@ export default function App() {
                     />
                   </div>
 
-                  <button
+                   <button
                     type="submit"
                     className="w-full bg-brand-charcoal hover:bg-black text-white py-2.5 rounded font-mono font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all"
                   >
                     <Lock className="w-4 h-4 text-brand-sage" /> Authenticate
                     Session
-                  </button>
-                </form>
+                   </button>
+                   <button type="button" onClick={() => { setIsForgotPasswordMode(true); setLoginError(""); }} className="w-full text-brand-forest font-bold text-xs">Forgot password?</button>
+                 </form>
               ) : (
                 /* Signup / Provisioning Form */
                 <form onSubmit={handleFormSignup} className="space-y-4 text-xs">
@@ -1991,6 +2013,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         setIsSignUpMode(false);
+                        setIsForgotPasswordMode(false);
                         setSignupError("");
                       }}
                       className="text-brand-forest font-bold hover:underline font-mono"
@@ -2004,6 +2027,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         setIsSignUpMode(true);
+                        setIsForgotPasswordMode(false);
                         setLoginError("");
                       }}
                       className="text-brand-forest font-bold hover:underline font-mono"

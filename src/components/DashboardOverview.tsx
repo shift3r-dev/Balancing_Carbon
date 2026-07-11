@@ -382,7 +382,7 @@ export default function DashboardOverview({
         </div>
 
         <div className="bg-white border border-brand-border rounded-xl p-5 shadow-sm">
-          <h3 className="text-sm font-bold font-mono uppercase text-brand-charcoal">AI Insights From Calculations</h3>
+          <h3 className="text-sm font-bold font-mono uppercase text-brand-charcoal">Calculation Insights</h3>
           <p className="text-xs text-gray-500 mt-1">Generated only from existing dashboard values.</p>
           <div className="mt-4 space-y-3">
             {model.insights.map((insight) => (
