@@ -1,184 +1,72 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Bot, Send, User, Sparkles, HelpCircle, AlertCircle, 
-  ArrowRight, ShieldCheck, RefreshCw, Layers 
-} from 'lucide-react';
+import { Activity, AlertCircle, Bot, CheckCircle2, Database, History, Laptop, LoaderCircle, MessageSquarePlus, Send, ShieldCheck, Square, Trash2, User } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-interface Message {
-  id: string;
-  sender: 'user' | 'assistant';
-  text: string;
+import { ensureFreshSession, getAuthenticatedHeaders } from '../services/apiClient.ts';
+import type { ViewState } from '../types.ts';
+
+interface Citation { id: string; label: string; type: string; detail: string; recordId?: string; }
+interface Message { id: string; sender: 'user' | 'assistant'; text: string; citations?: Citation[]; suggestedActions?: string[]; limitations?: string[]; createdAt?: string; }
+interface Conversation { id: string; title: string; last_updated: string; provider: string; model: string; }
+
+async function api(url: string, options?: RequestInit) {
+  await ensureFreshSession();
+  const response = await fetch(url, { ...options, headers: { ...getAuthenticatedHeaders(options?.headers), 'Content-Type': 'application/json' } });
+  const payload = response.status === 204 ? {} : await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, payload };
 }
 
-export default function AIAssistantModule() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      sender: 'assistant',
-      text: "Hello! I am your Balancing Carbon Intelligent ESG & Decarbonization Assistant. I have indexed your organization's manufacturing plants (Mohali, Pune, Chennai), fuel ledger sheets, and compliance documents.\n\nHow can I help you compile evidence, answer questionnaires, or strategize carbon reduction models today?"
-    }
-  ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+const welcome: Message = { id: 'welcome', sender: 'assistant', text: 'I am your local Carbon Copilot. I can explain recorded emissions, facility hotspots, evidence gaps, projects, and reports using only your organisation data. Carbon calculations remain controlled by the deterministic accounting engine.' };
+const prompts = ['Summarize our recorded carbon footprint.', 'Which facilities and sources are the largest hotspots?', 'What evidence or data-quality gaps should we address?', 'Review our reduction projects and suggest next actions.'];
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+export default function AIAssistantModule({ onNavigate }: { onNavigate?: (view: ViewState) => void }) {
+  const [messages, setMessages] = useState<Message[]>([welcome]); const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationId, setConversationId] = useState(''); const [input, setInput] = useState(''); const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<any>(null); const [notice, setNotice] = useState(''); const bottomRef = useRef<HTMLDivElement>(null);
+  const [usage, setUsage] = useState<any>(null); const [progress, setProgress] = useState(''); const abortRef = useRef<AbortController | null>(null);
+  const online = Boolean(status?.enabled && status?.available && status?.modelAvailable);
 
-  const samplePrompts = [
-    "Draft reduction strategies for Chakan, Pune plant.",
-    "Verify Tata Motors environmental policy alignment.",
-    "Compare grid emission factors of Punjab and Tamil Nadu.",
-    "Draft answer for OEM questionnaire about child labor."
-  ];
+  const refreshConversations = async () => { const result = await api('/api/ai/conversations'); if (result.ok) setConversations(result.payload.conversations ?? []); };
+  useEffect(() => { void Promise.all([api('/api/ai/status').then((result) => setStatus(result.payload)), refreshConversations(), api('/api/ai/usage?days=30').then((result) => { if (result.ok) setUsage(result.payload); })]); }, []);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, loading]);
 
-  const handleSend = async (textToSend: string) => {
-    if (!textToSend.trim()) return;
-
-    const userMsgId = 'user-' + Date.now();
-    setMessages(prev => [...prev, { id: userMsgId, sender: 'user', text: textToSend }]);
-    setInput('');
-    setLoading(true);
-
-    window.setTimeout(() => {
-      setMessages(prev => [
-        ...prev, 
-        { 
-          id: 'ai-' + Date.now(), 
-          sender: 'assistant', 
-          text: "The Carbon AI Assistant is planned as a future feature. Once an AI API subscription is available, this workspace can be connected to the secure assistant backend. For now, the rest of the dashboard stores and retrieves operational data directly from Supabase." 
-        }
-      ]);
-      setLoading(false);
-    }, 400);
+  const loadConversation = async (id: string) => { if (loading) return; const result = await api(`/api/ai/conversations/${id}`); if (result.ok) { setConversationId(id); setMessages(result.payload.conversation.messages?.length ? result.payload.conversation.messages : [welcome]); setNotice(''); } };
+  const newConversation = () => { if (loading) return; setConversationId(''); setMessages([welcome]); setNotice(''); };
+  const archiveConversation = async (id: string) => { if (loading) return; const result = await api(`/api/ai/conversations/${id}`, { method: 'DELETE' }); if (result.ok) { if (conversationId === id) newConversation(); await refreshConversations(); } };
+  const send = async (value = input) => {
+    const question = value.trim(); if (!question || loading || !online) return;
+    setMessages((current) => [...current, { id: `local-user-${Date.now()}`, sender: 'user', text: question }]); setInput(''); setLoading(true); setNotice(''); setProgress('Preparing request...');
+    try {
+      await ensureFreshSession(); const controller = new AbortController(); abortRef.current = controller;
+      const response = await fetch('/api/ai/chat/stream', { method: 'POST', signal: controller.signal, headers: { ...getAuthenticatedHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ question, conversationId: conversationId || undefined }) });
+      if (!response.ok || !response.body) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error ?? 'The local model could not answer this request.'); }
+      const reader = response.body.getReader(), decoder = new TextDecoder(); let buffer = '';
+      while (true) { const { done, value: chunk } = await reader.read(); if (done) break; buffer += decoder.decode(chunk, { stream: true }); const lines = buffer.split('\n'); buffer = lines.pop() ?? ''; for (const line of lines.filter(Boolean)) { const event = JSON.parse(line); if (event.event === 'context' || event.event === 'generating') setProgress(event.message); if (event.event === 'complete') { setConversationId(event.conversationId); setMessages(event.messages ?? []); setProgress(''); await refreshConversations(); const usageResult = await api('/api/ai/usage?days=30'); if (usageResult.ok) setUsage(usageResult.payload); } if (event.event === 'error') throw new Error(event.error); } }
+    } catch (error) { setNotice(error instanceof DOMException && error.name === 'AbortError' ? 'Generation cancelled.' : (error instanceof Error ? error.message : 'The local Ollama service is unavailable.')); }
+    setLoading(false); setProgress(''); abortRef.current = null;
   };
+  const citationView = (citation: Citation): ViewState | null => citation.type === 'facility' ? 'dashboard-facilities' : citation.type === 'energy-record' ? 'dashboard-energy' : citation.type === 'report' ? 'dashboard-reports' : citation.type === 'document' ? 'dashboard-documents' : citation.type === 'project' ? 'dashboard-intelligence' : null;
+  const activeTitle = useMemo(() => conversations.find((item) => item.id === conversationId)?.title ?? 'New conversation', [conversations, conversationId]);
 
-  return (
-    <div className="space-y-6">
-      
-      {/* Title Header Banner */}
-      <div className="bg-white p-5 rounded-xl border border-brand-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-xl font-extrabold text-brand-charcoal">Carbon AI Assistant</h1>
-          <p className="text-xs text-gray-500 font-mono mt-0.5">
-            Real-time, context-aware advice leveraging active facility parameters and compliance folders.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs font-mono bg-emerald-50 text-brand-forest border border-emerald-100 px-3 py-1.5 rounded-lg">
-          <ShieldCheck className="w-4 h-4 shrink-0" />
-          <span>Calculations Guarded by Hardened Multi-Tenant Contexts</span>
-        </div>
-      </div>
+  return <div className="space-y-5">
+    <header className="flex flex-col gap-4 rounded-lg border border-brand-border bg-white p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div><div className="flex items-center gap-2"><Bot className="h-5 w-5 text-brand-forest" /><h1 className="text-xl font-extrabold text-brand-charcoal">Carbon Copilot</h1></div><p className="mt-1 text-xs text-gray-500">Read-only, tenant-grounded sustainability guidance powered by your local model.</p></div>
+      <div className={`flex items-center gap-2 border px-3 py-2 text-xs font-semibold ${online ? 'border-emerald-200 bg-emerald-50 text-brand-forest' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{status === null ? <LoaderCircle className="h-4 w-4 animate-spin" /> : online ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}<span>{status === null ? 'Checking local model' : online ? `${status.model} active locally` : status?.available ? `Model ${status?.model ?? ''} is not installed` : 'Local Ollama is offline'}</span></div>
+    </header>
 
-      {/* Main Chat Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        
-        {/* Chat Thread */}
-        <div className="bg-white border border-brand-border rounded-xl lg:col-span-3 flex flex-col h-[520px] overflow-hidden">
-          
-          {/* Thread list */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            {messages.map(msg => {
-              const isAI = msg.sender === 'assistant';
-              return (
-                <div key={msg.id} className={`flex gap-3 max-w-4xl ${isAI ? '' : 'flex-row-reverse ml-auto'}`}>
-                  
-                  {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    isAI ? 'bg-brand-forest text-white' : 'bg-brand-charcoal text-brand-sage'
-                  }`}>
-                    {isAI ? <Bot className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                  </div>
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[260px_minmax(0,1fr)_280px]">
+      <aside className="border border-brand-border bg-white p-4">
+        <button type="button" onClick={newConversation} className="flex w-full items-center justify-center gap-2 bg-brand-charcoal px-3 py-2.5 text-xs font-bold text-white"><MessageSquarePlus className="h-4 w-4" />New conversation</button>
+        <div className="mt-5 flex items-center gap-2 border-b border-brand-border pb-2"><History className="h-4 w-4 text-brand-forest" /><h2 className="text-xs font-black uppercase">Your history</h2></div>
+        <div className="mt-2 max-h-[500px] space-y-1 overflow-y-auto">{conversations.map((item) => <div key={item.id} className={`group flex items-center ${conversationId === item.id ? 'bg-brand-sage' : 'hover:bg-brand-offwhite'}`}><button type="button" onClick={() => void loadConversation(item.id)} className="min-w-0 flex-1 px-3 py-2 text-left"><span className="block truncate text-xs font-semibold">{item.title}</span><span className="text-[10px] text-gray-500">{new Date(item.last_updated).toLocaleString()}</span></button><button type="button" onClick={() => void archiveConversation(item.id)} className="mr-1 p-2 text-gray-400 opacity-0 hover:text-red-600 group-hover:opacity-100" title="Archive conversation"><Trash2 className="h-3.5 w-3.5" /></button></div>)}{!conversations.length ? <p className="py-4 text-center text-xs text-gray-400">No saved conversations.</p> : null}</div>
+      </aside>
 
-                  {/* Body text bubble */}
-                  <div className={`p-4 rounded-xl text-xs leading-relaxed max-w-2xl border ${
-                    isAI 
-                      ? 'bg-brand-offwhite text-brand-charcoal border-brand-border/60' 
-                      : 'bg-brand-charcoal text-white border-brand-charcoal'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
-                  </div>
+      <main className="flex h-[650px] min-w-0 flex-col overflow-hidden border border-brand-border bg-white">
+        <div className="border-b border-brand-border px-5 py-3"><p className="truncate text-sm font-black">{activeTitle}</p><p className="text-[10px] text-gray-500">Responses are advisory and cannot update ledger data.</p></div>
+        <div className="flex-1 space-y-5 overflow-y-auto p-5">{messages.map((message) => <article key={message.id} className={`flex gap-3 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}><div className={`flex h-8 w-8 shrink-0 items-center justify-center ${message.sender === 'assistant' ? 'bg-brand-forest text-white' : 'bg-brand-charcoal text-brand-sage'}`}>{message.sender === 'assistant' ? <Bot className="h-4 w-4" /> : <User className="h-4 w-4" />}</div><div className={`max-w-[82%] border p-4 text-sm leading-6 ${message.sender === 'assistant' ? 'border-brand-border bg-brand-offwhite text-brand-charcoal' : 'border-brand-charcoal bg-brand-charcoal text-white'}`}><p className="whitespace-pre-wrap">{message.text}</p>{message.citations?.length ? <div className="mt-4 border-t border-brand-border pt-3"><p className="mb-2 text-[10px] font-black uppercase text-gray-500">Sources</p><div className="flex flex-wrap gap-2">{message.citations.map((citation) => { const view = citationView(citation); return <button type="button" key={citation.id} disabled={!view || !onNavigate} onClick={() => { if (view) onNavigate?.(view); }} title={`${citation.detail}${view ? ' - Open record module' : ''}`} className="inline-flex items-center gap-1 border border-brand-border bg-white px-2 py-1 text-[10px] text-brand-forest hover:border-brand-forest disabled:cursor-default"><Database className="h-3 w-3" />[{citation.id}] {citation.label}</button>; })}</div></div> : null}{message.suggestedActions?.length ? <div className="mt-4"><p className="text-[10px] font-black uppercase text-gray-500">Suggested actions</p><ul className="mt-1 list-disc space-y-1 pl-4 text-xs">{message.suggestedActions.map((action) => <li key={action}>{action}</li>)}</ul></div> : null}{message.limitations?.length ? <div className="mt-3 border-l-2 border-amber-400 pl-3 text-xs text-amber-800">{message.limitations.join(' ')}</div> : null}</div></article>)}{loading ? <div className="flex items-center gap-3 text-xs text-gray-500"><div className="flex h-8 w-8 items-center justify-center bg-brand-forest text-white"><LoaderCircle className="h-4 w-4 animate-spin" /></div>{progress || 'Grounding the answer in your tenant records...'}</div> : null}{notice ? <p className="border border-red-200 bg-red-50 p-3 text-xs text-red-700">{notice}</p> : null}<div ref={bottomRef} /></div>
+        <div className="border-t border-brand-border p-4"><div className="flex gap-2"><textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} disabled={loading || !online} rows={2} placeholder="Ask about recorded emissions, facilities, evidence, reports, or reduction projects..." className="min-h-14 flex-1 resize-none border border-brand-border bg-brand-offwhite px-3 py-2 text-sm outline-hidden focus:border-brand-forest disabled:opacity-50" />{loading ? <button type="button" onClick={() => abortRef.current?.abort()} className="flex w-12 items-center justify-center bg-brand-charcoal text-white" title="Cancel generation"><Square className="h-4 w-4" /></button> : <button type="button" onClick={() => void send()} disabled={!online || !input.trim()} className="flex w-12 items-center justify-center bg-brand-forest text-white disabled:opacity-40" title="Send question"><Send className="h-4 w-4" /></button>}</div></div>
+      </main>
 
-                </div>
-              );
-            })}
-            
-            {/* Typing Loader Indicator */}
-            {loading && (
-              <div className="flex gap-3 max-w-xl">
-                <div className="w-8 h-8 rounded-lg bg-brand-forest text-white flex items-center justify-center">
-                  <Bot className="w-4 h-4 animate-spin" />
-                </div>
-                <div className="bg-brand-offwhite text-gray-400 p-4 rounded-xl text-xs border border-brand-border/60 font-mono">
-                  Synthesizing audit trails and cross-referencing facility energy balances...
-                </div>
-              </div>
-            )}
-            <div ref={scrollRef} />
-          </div>
-
-          {/* Quick Sandbox Selector prompts */}
-          <div className="px-5 py-2.5 bg-brand-offwhite border-t border-brand-border/60 flex flex-wrap gap-1.5 text-[10px] font-mono font-bold">
-            {samplePrompts.map(pr => (
-              <button
-                key={pr}
-                onClick={() => handleSend(pr)}
-                disabled={loading}
-                className="bg-white hover:bg-brand-sage/20 border border-brand-border/80 px-2.5 py-1 rounded-lg text-gray-600 transition-all cursor-pointer whitespace-nowrap"
-              >
-                {pr}
-              </button>
-            ))}
-          </div>
-
-          {/* Text Input area */}
-          <div className="p-4 border-t border-brand-border flex gap-2 bg-white">
-            <input
-              type="text"
-              placeholder="Ask anything about Scope emissions, Indian CEA Grid factors, or custom recommendations..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
-              disabled={loading}
-              className="flex-1 border border-brand-border rounded-lg text-xs px-4 py-3 bg-brand-offwhite focus:outline-none focus:ring-1 focus:ring-brand-forest disabled:opacity-50"
-            />
-            <button
-              onClick={() => handleSend(input)}
-              disabled={loading || !input.trim()}
-              className="bg-brand-forest hover:bg-brand-green-sec text-white px-5 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-
-        </div>
-
-        {/* Informational Guidelines Sidebar */}
-        <div className="space-y-6">
-          
-          <div className="bg-brand-charcoal text-white p-5 rounded-xl border border-white/5 space-y-4">
-            <h4 className="text-xs font-bold font-mono text-brand-sage uppercase tracking-wider flex items-center gap-1">
-              <Layers className="w-4 h-4 text-brand-forest" /> Secure Retrieval Context
-            </h4>
-            <p className="text-xs text-gray-400 leading-normal">
-              Balancing Carbon's Assistant is wired to only see details associated with Apex Precision Components. Under the hood, any query you type is bound to a backend retrieval chain injecting active facility capacities, compliance checklists, and file listings.
-            </p>
-          </div>
-
-          <div className="bg-white border border-brand-border rounded-xl p-5 space-y-3 text-xs text-gray-500">
-            <h4 className="font-bold text-xs uppercase font-mono text-brand-charcoal">Example Queries to Try</h4>
-            <ul className="space-y-2 list-disc pl-4 leading-relaxed">
-              <li>"Summarize my Environmental Policy gaps and recommended actions."</li>
-              <li>"Calculate carbon reduction if I double renewable solar offset in Pune plant."</li>
-              <li>"What CEA grid emissions factor is currently running?"</li>
-            </ul>
-          </div>
-
-        </div>
-
-      </div>
-
+      <aside className="space-y-4"><section className="bg-brand-charcoal p-5 text-white"><div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-brand-sage" /><h2 className="text-xs font-black uppercase">Grounding boundary</h2></div><p className="mt-3 text-xs leading-5 text-gray-300">The model receives a read-only snapshot of your organisation, facilities, activity summaries, evidence metadata, reports, and projects. It receives no database credentials or write tools.</p></section><section className="border border-brand-border bg-white p-5"><div className="flex items-center gap-2"><Laptop className="h-4 w-4 text-brand-forest" /><h2 className="text-xs font-black uppercase">Local processing</h2></div><p className="mt-3 text-xs leading-5 text-gray-600">Provider: Ollama<br />Model: {status?.model ?? 'Not detected'}<br />External AI: disabled</p></section>{usage ? <section className="border border-brand-border bg-white p-5"><div className="flex items-center gap-2"><Activity className="h-4 w-4 text-brand-forest" /><h2 className="text-xs font-black uppercase">30-day usage</h2></div><div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="bg-brand-offwhite p-2"><span className="block text-[10px] text-gray-500">Requests</span><strong>{usage.summary.requests}</strong></div><div className="bg-brand-offwhite p-2"><span className="block text-[10px] text-gray-500">Failures</span><strong>{usage.summary.failures}</strong></div><div className="bg-brand-offwhite p-2"><span className="block text-[10px] text-gray-500">Average</span><strong>{usage.summary.averageDurationMs} ms</strong></div><div className="bg-brand-offwhite p-2"><span className="block text-[10px] text-gray-500">Tokens</span><strong>{usage.summary.promptTokens + usage.summary.completionTokens}</strong></div></div></section> : null}<section className="border border-brand-border bg-white p-5"><h2 className="text-xs font-black uppercase">Try asking</h2><div className="mt-3 space-y-2">{prompts.map((prompt) => <button type="button" key={prompt} onClick={() => void send(prompt)} disabled={!online || loading} className="w-full border border-brand-border p-2 text-left text-xs text-gray-600 hover:bg-brand-offwhite disabled:opacity-40">{prompt}</button>)}</div></section></aside>
     </div>
-  );
+  </div>;
 }

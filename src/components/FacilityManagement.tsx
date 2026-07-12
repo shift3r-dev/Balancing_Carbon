@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { 
   Plus, Edit, Trash2, Building, MapPin, Package, Fuel, Zap, 
-  RefreshCw, CheckCircle, Scale, ShieldAlert, X, Shield, Copy, Check
+  RefreshCw, CheckCircle, Scale, ShieldAlert, X, Shield, Copy, Check, Database
 } from 'lucide-react';
 import { Facility } from '../types.ts';
+import EntityMetadataDialog from './EntityMetadataDialog.tsx';
 
 interface FacilityProps {
   facilities: Facility[];
@@ -21,6 +22,7 @@ export default function FacilityManagement({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [metadataFacility, setMetadataFacility] = useState<Facility | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -142,6 +144,7 @@ export default function FacilityManagement({
                     {f.esgReadinessStatus}
                   </span>
                   <div className="flex items-center gap-1">
+                    <button type="button" onClick={() => setMetadataFacility(f)} className="p-1.5 text-gray-400 hover:text-brand-forest rounded hover:bg-gray-100" title="Open custom facility profile"><Database className="w-3.5 h-3.5" /></button>
                     <button
                       type="button"
                       onClick={() => handleToggleCompare(f.id)}
@@ -428,6 +431,7 @@ export default function FacilityManagement({
           </div>
         </div>
       )}
+      {metadataFacility ? <EntityMetadataDialog entityKey="facility" recordId={metadataFacility.id} recordName={metadataFacility.name} onClose={() => setMetadataFacility(null)} /> : null}
 
     </div>
   );

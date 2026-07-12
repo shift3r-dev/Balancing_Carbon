@@ -77,19 +77,20 @@ export async function listMetadataForms(organisationId: string, entityKey?: stri
   });
 }
 
-async function getFormRecord(organisationId: string, formId?: string, entityKey?: string) {
+async function getFormRecord(organisationId: string, formId?: string, entityKey?: string, publishedOnly = false) {
   let query = supabaseAdmin.from('metadata_forms').select('*, metadata_entities!inner(entity_key,name)').is('deleted_at', null).or(`organisation_id.is.null,organisation_id.eq.${organisationId}`);
   if (formId) query = query.eq('id', formId);
   if (entityKey) query = query.eq('metadata_entities.entity_key', entityKey);
-  const { data, error } = await query.in('status', ['draft', 'published']).order('organisation_id', { ascending: false }).order('version_number', { ascending: false }).limit(1);
+  query = publishedOnly ? query.eq('status', 'published') : query.in('status', ['draft', 'published']);
+  const { data, error } = await query.order('organisation_id', { ascending: false }).order('version_number', { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   return data?.[0] ?? null;
 }
 
-export async function loadMetadataForm(organisationId: string, options: { formId?: string; entityKey?: string; languageCode?: string } = {}): Promise<MetadataForm | null> {
-  const key = cacheKey('form', organisationId, `${options.formId ?? ''}:${options.entityKey ?? ''}:${options.languageCode ?? 'en'}`);
+export async function loadMetadataForm(organisationId: string, options: { formId?: string; entityKey?: string; languageCode?: string; publishedOnly?: boolean } = {}): Promise<MetadataForm | null> {
+  const key = cacheKey('form', organisationId, `${options.formId ?? ''}:${options.entityKey ?? ''}:${options.languageCode ?? 'en'}:${options.publishedOnly ? 'published' : 'all'}`);
   return cached(key, async () => {
-    const form = await getFormRecord(organisationId, options.formId, options.entityKey);
+    const form = await getFormRecord(organisationId, options.formId, options.entityKey, options.publishedOnly);
     if (!form) return null;
     const [sectionsResult, fieldsResult, types] = await Promise.all([
       supabaseAdmin.from('metadata_form_sections').select('*').eq('form_id', form.id).is('deleted_at', null).order('position'),

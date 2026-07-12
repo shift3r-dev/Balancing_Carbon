@@ -2,9 +2,16 @@
 
 ## Purpose
 
-Phase 8 adds a tenant-safe, metadata-driven extension layer to Balancing Carbon. It allows an organisation to define supplemental fields, forms, layouts, rules, permissions, workflow states, templates, translations, and stored values without changing carbon-accounting, reporting, dashboard, or authentication code.
+The metadata foundation adds a tenant-safe extension layer to Balancing Carbon. It allows an organisation to define supplemental fields, forms, layouts, rules, permissions, workflow states, templates, translations, and stored values without changing carbon-accounting, reporting, dashboard, or authentication code. It is supporting platform infrastructure; roadmap Phase 8 is the AI Carbon Copilot.
 
 Existing forms remain the operational source of truth. Metadata forms are introduced alongside them and are intended for progressive migration of new customer-specific workflows.
+
+## Runtime rollout status
+
+- Facility records are the first live metadata integration. The database icon on each facility opens its published custom profile.
+- Runtime screens load published forms only. Draft forms remain visible inside Metadata Studio but cannot affect operational users.
+- Facility metadata values are validated by the server and stored against the tenant and facility record ID with audit history.
+- Additional entity integrations can follow the same renderer and value API instead of adding entity-specific custom columns.
 
 ## Deployment
 
@@ -75,10 +82,10 @@ Validation rules support required, min/max, regex, uniqueness, cross-field check
 3. Inspect the supplied system template or create a tenant form.
 4. Add sections and fields, reorder sections by dragging, then save a draft.
 5. Publish when the form has been reviewed. Each save creates an immutable snapshot.
-6. Use the render endpoint or `DynamicMetadataForm` component to attach the form to a new or progressively migrated screen.
+6. Open **Facilities**, select the database icon on a facility, and enter values using the published dynamic form.
 
 ## Current boundaries
 
-- The platform does not replace existing facility, activity, report, or calculation forms automatically.
+- The platform supplements the facility form but does not replace existing facility, activity, report, or calculation fields automatically.
 - Carbon calculations remain implemented in the dedicated accounting engine and are not evaluated from metadata formulas.
 - JSON is the full-fidelity import/export and backup format. CSV import/export supports field-definition interchange using `field_key,label,type,section_key,required` columns.

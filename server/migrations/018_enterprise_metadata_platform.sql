@@ -1,4 +1,4 @@
--- Phase 8: enterprise metadata platform.
+-- Enterprise metadata platform foundation (supporting infrastructure, not roadmap Phase 8).
 -- Apply after 017. This is additive: existing application forms remain unchanged.
 
 create table if not exists metadata_entities (

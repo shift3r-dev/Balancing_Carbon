@@ -37,7 +37,7 @@ After login, the authenticated dashboard opens. The sidebar is grouped into:
 - **Carbon Inventory:** calculator, energy ledger, production, and emission scopes
 - **Intelligence:** diagnostics, hotspots, scenarios, and projects
 - **Reporting & Evidence:** reports, documents, OEM questionnaires, and ESG readiness
-- **System:** Data Hub, Metadata Studio, subscription/settings, and future AI functions
+- **System:** Data Hub, Metadata Studio, subscription/settings, and the local Carbon Copilot
 
 The overview summarizes operational footprint, Scope 1 and Scope 2 emissions, intensity, renewable share, data quality, projects, source contribution, trends, and facility performance.
 
@@ -175,9 +175,9 @@ Scenario results do not alter the carbon ledger. They remain planning artifacts 
 
 ## 13. Manage documents and evidence
 
-Open **Documents** to maintain evidence metadata for bills, invoices, meter records, certificates, policies, and supporting files. Evidence references are linked to activities and reports where supported.
+Open **Documents** to upload bills, invoices, meter records, certificates, policies, and supporting files. PDF, DOCX, TXT, CSV, Markdown, and JSON files up to 10 MB are stored in the private tenant evidence bucket.
 
-The current application manages document metadata. A production storage bucket and malware-scanning pipeline must be configured before accepting real customer file binaries.
+The vault shows extraction status. `completed` files can provide question-relevant excerpts to Carbon Copilot, `empty` commonly indicates an image-only scan, and `failed` requires review. Downloads use short-lived signed links. Production deployments should add malware scanning and retention policies before accepting external customer files.
 
 ## 14. Complete ESG and OEM workflows
 
@@ -219,7 +219,20 @@ Open **System Settings** to review the current plan, limits, and entitlements. O
 
 Important roles include organisation administrator, sustainability manager, plant manager, operator, and auditor. Permissions control facilities, activities, reports, metadata, data imports, connectors, and staging approval.
 
-## 18. Routine monthly operating cycle
+## 18. Use Carbon Copilot
+
+Open **Carbon AI Assistant** to ask questions about recorded emissions, facilities, evidence, reports, ESG gaps, opportunities, and projects.
+
+- Responses are grounded in the signed-in organisation only.
+- Source controls navigate to the relevant operational module.
+- Extracted document citations use `X` identifiers.
+- Suggested actions remain advisory and never update the ledger.
+- Cancel a long-running local request with the stop control.
+- Administrators with audit access can review request count, failure rate, latency, and token usage.
+
+Do not treat Copilot output as a verified calculation or regulatory opinion. Calculations remain in the deterministic accounting engine, and formal reports still require review and approval.
+
+## 19. Routine monthly operating cycle
 
 A typical monthly process is:
 
@@ -233,20 +246,20 @@ A typical monthly process is:
 8. Generate internal management reports.
 9. At reporting deadlines, freeze, review, approve, and export formal reports.
 
-## 19. Controls before production launch
+## 20. Controls before production launch
 
 Before onboarding real customers:
 
 - Replace prototype emission factors with approved authoritative factors
 - Configure Supabase production RLS policies and separate service credentials
-- Configure object storage, file scanning, retention, and backups
+- Validate private object storage, add malware scanning, retention, and backups
 - Configure secrets management for connector credentials
 - Add rate limiting, observability, alerts, and background workers
 - Complete penetration, dependency, load, disaster-recovery, and privacy testing
 - Configure outbound email and scheduled reporting workers
-- Keep AI integrations disabled until an approved provider, budget, privacy policy, and API keys are available
+- Review the local AI deployment, model license, privacy policy, retention, access controls, and production hosting boundary
 
-## 20. Support troubleshooting
+## 21. Support troubleshooting
 
 - **API endpoint returns 404:** restart the Node server after backend code changes.
 - **Facility is invalid:** use the copyable facility ID, not the name.
@@ -255,3 +268,5 @@ Before onboarding real customers:
 - **Factor error:** confirm the source type has an active registry factor for the facility country and date.
 - **Unit error:** select a compatible unit from the central registry.
 - **Dashboard is unchanged:** confirm the row is posted and within the active reporting period.
+- **Copilot is offline:** confirm Ollama is running and the configured model is installed.
+- **Document has no excerpts:** check extraction status; scanned PDFs require a future OCR service.

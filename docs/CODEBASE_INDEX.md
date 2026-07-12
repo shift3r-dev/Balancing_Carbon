@@ -1,6 +1,6 @@
 # Codebase Index
 
-Last reviewed: 2026-07-11 after Phase 7 localization and reference-data foundation. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
+Last reviewed: 2026-07-13 after Phase 10 User Enablement. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase. Phase 9 and 10 details are indexed in their dedicated documents.
 
 ## Folder Tree
 
@@ -119,7 +119,7 @@ flowchart LR
 | `SubscriptionSettings.tsx` | Plan, usage, license settings | Active |
 | `EntitlementGate.tsx` | Locked-state wrapper | Active |
 | `LocalizationSettings.tsx` | Organization locale, currency, standards, and display-unit preferences | Active |
-| `ReportingWorkspace.tsx` | Versioned report generation, readiness, review and export dashboard | Active |
+| `ReportingWorkspace.tsx` | Responsive ESG report library, page canvas, block inspector, branding, evidence, AI drafting, workflow, and exports | Active |
 | `PricingPage.tsx` | Public plan catalog | Active |
 | `PublicCarbonCalculator.tsx` | Public, non-persistent calculation sandbox | Active; clearly keep separate from audit ledger |
 | `AIAssistantModule.tsx` | Future AI placeholder | Active placeholder; no API connection |
@@ -201,7 +201,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `src/components/DocumentCentre.tsx` | Evidence metadata UI | Document types | App | Active | Medium | Add real storage upload later |
 | `src/components/EnergyTracking.tsx` | Ledger input/table UI | Energy/production types | App | Active | High | Add registry factor/data-quality display |
 | `src/components/EntitlementGate.tsx` | Access-locked panel | Entitlement hook | App | Active | Low | Keep |
-| `src/components/ReportingWorkspace.tsx` | Report template, version, validation, review, and export UI | API client/entitlements | App | Active | High | Keep |
+| `src/components/ReportingWorkspace.tsx` | Three-pane ESG Reporting Studio and governed publication workflow | Reporting APIs, documents, local AI | App | Active | Very high | Split canvas and inspector after the Phase 9 stabilization cycle |
 | `src/components/LocalizationSettings.tsx` | Locale and unit preference controls | API client | Subscription settings | Active | Medium | Keep |
 | `src/components/ESGAssessmentModule.tsx` | ESG UI | ESG types | App | Active | High | Keep |
 | `src/components/FacilityManagement.tsx` | Facility UI | Facility types | App | Active | High | Add Phase 5 fields/archive controls |
@@ -212,6 +212,9 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `src/components/ServiceFirstFlow.tsx` | Service-first public flow | Redesign data | App | Active | High | Split data/rendering |
 | `src/components/SubscriptionSettings.tsx` | Subscription settings | Subscription/entitlement hooks | App | Active | Medium | Keep |
 | `src/components/EnterpriseDataHub.tsx` | Phase 7 import, mapping, staging, connector, and environmental-ledger workspace | Data Platform APIs, auth context | App dashboard | Active | Very high | Split tabs into focused components as connector workflows expand |
+| `src/components/EntityMetadataDialog.tsx` | Live published metadata form and value editor for a concrete entity record | Metadata render/value APIs, DynamicMetadataForm | Facility Management; future metadata entity screens | Active | Medium | Reuse for progressive metadata integrations |
+| `src/components/AIAssistantModule.tsx` | Phase 8 local Carbon Copilot, personal history, cancellable progress stream, citation navigation, usage summary, and provider states | AI Copilot APIs | App dashboard | Active | High | Keep; split history, chat, and analytics panels as the module expands |
+| `src/components/UserEnablement.tsx` | First-run welcome, role checklist, progress widget, contextual Help, guided tours, and searchable Learning Centre | Enablement API, authorization context | Dashboard shell | Active | Very high | Split guide catalog and walkthrough renderer after adoption analytics stabilize |
 
 ### Backend core and services
 
@@ -233,6 +236,13 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `server/dataIngestion.ts` | Deterministic CSV/XLSX parsing, mapping suggestions, validation, duplicate and anomaly detection | ExcelJS, unit normalization | Data Platform router/tests | Active | High | Keep; add larger fixture and property tests |
 | `server/dataIngestion.test.ts` | Phase 7 parser and quality-engine tests | Data ingestion service | `npm run test:data` | Active | Medium | Keep |
 | `server/operationalPostingService.ts` | Governed posting from approved staging records into operational ledgers with carbon lineage | Supabase, measurement and ledger services | Data Platform router | Active | Very high | Keep; move multi-table posting into database transactions/RPCs |
+| `server/ai/ollamaProvider.ts` | Local Ollama health and structured generation adapter | Ollama HTTP API | AI Copilot router | Active | Medium | Keep provider-isolated for future deployment choices |
+| `server/ai/carbonCopilotContext.ts` | Read-only, bounded tenant context, evidence retrieval, and citation catalog | Supabase, document retrieval | AI Copilot router | Active | High | Keep retrieval limits conservative and tenant-scoped |
+| `server/documentExtraction.ts` | Evidence signature validation, PDF/DOCX/text extraction, bounded chunking, and lexical retrieval | pdf-parse, Mammoth | Reporting and Copilot context services | Active | High | Keep; add isolated OCR worker for scanned evidence later |
+| `server/documentExtraction.test.ts` | Evidence validation, chunking, and retrieval tests | Document extraction service | `npm run test:documents` | Active | Low | Keep |
+| `server/reportStudioEngine.ts` | Deterministic report numbering, cross references, and PDF/DOCX/PPTX/XLSX composition | PDFKit, docx, PptxGenJS, ExcelJS | Reporting platform router | Active | High | Keep export-format concerns isolated |
+| `server/reportStudioEngine.test.ts` | Numbering, cross-reference, and output package signature tests | Report Studio engine | `npm run test:studio` | Active | Low | Keep and add visual export fixtures |
+| `server/ai/ollamaProvider.test.ts` | Ollama adapter health and structured-response tests | Provider | `npm run test:ai` | Active | Low | Keep |
 | `server/subscriptionService.ts` | Plans/subscription lifecycle | Supabase/entitlements | Subscription router | Active | Medium | Keep |
 | `server/supabase.ts` | Legacy optional Supabase client | dotenv | No runtime imports | Deprecated | Low | Remove or consolidate into clients |
 | `server/supabaseClients.ts` | Required admin/auth Supabase clients | Environment | Auth/services/routers | Active | Low | Keep |
@@ -254,10 +264,12 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `server/routes/organisationRoutes.ts` | Organisation profile API | RBAC/Supabase | `server.ts` | Active | Medium | Keep |
 | `server/routes/productionRoutes.ts` | Production/activity API | Supabase | `server.ts` | Active | Medium | Keep |
 | `server/routes/reportingRoutes.ts` | Documents/reports APIs | Limits/mappers | `server.ts` | Active | Medium | Keep |
-| `server/routes/reportingPlatformRoutes.ts` | Versioned reporting/compliance APIs | Ledger, entitlements, report engine | `server.ts` | Active | High | Keep |
+| `server/routes/reportingPlatformRoutes.ts` | Versioned reporting, ESG Studio, evidence, AI narrative, approval, publishing, and export APIs | Ledger, entitlements, AI context, report engines | `server.ts` | Active | Very high | Split studio composition and export routes after stabilization |
 | `server/routes/referenceDataRoutes.ts` | Localization, units, and generic reference-data APIs | Registry/localization services | `server.ts` | Active | High | Keep |
 | `server/routes/metadataRoutes.ts` | Metadata registry, form CRUD, rendering, values, workflow, import/export APIs | Metadata engine, RBAC, Supabase | `server.ts` | Active | High | Keep; split builder/runtime endpoints if it expands |
 | `server/routes/dataPlatformRoutes.ts` | Connector catalog, mappings, import preview/commit, staging governance, posting, retries, and environmental-ledger APIs | Data ingestion, posting service, RBAC, Supabase | `server.ts` | Active | Very high | Split imports, staging, and connectors into separate routers as live adapters arrive |
+| `server/routes/aiCopilotRoutes.ts` | Authenticated local AI health, owned conversations, grounded chat, citations, and usage audit | Ollama provider, context assembler, Supabase | `server.ts` | Active | High | Keep read-only; never add mutation tools without a separate approval design |
+| `server/routes/enablementRoutes.ts` | Live onboarding signals and user-owned allow-listed learning progress | Auth, Supabase operational tables | `server.ts` | Active | Medium | Keep operational completion record-derived |
 | `server/reportingEngine.ts` | Pure reporting snapshot/validation/export functions | Node buffer | Reporting router/tests | Active | Medium | Keep |
 | `server/measurementService.ts` | Cached registry conversion service | Supabase | Energy/production/reporting/routes | Active | High | Keep |
 | `server/localizationService.ts` | Localization preference service | Supabase | Reference/reporting routes | Active | Medium | Keep |
@@ -296,6 +308,13 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `019_enterprise_data_platform.sql` | Connector catalog, connections, source definitions, mappings, import jobs, quality rules, pipeline events, schedules, governed staging, and RBAC | 018/005 | Phase 7 Data Platform runtime | Active | Very high | Apply before 020 and 021 |
 | `020_environmental_operational_ledgers.sql` | Tenant-scoped water, waste, material, and air-emission operational ledgers | 019/base tenant schema | Data Platform posting and ledger views | Active | High | Keep |
 | `021_energy_factor_registry_compatibility.sql` | Separates the current factor-registry reference from the legacy energy factor foreign key | 014/019 | Energy routes and staged posting | Active | Medium | Keep until the legacy factor column can be retired safely |
+| `022_ai_carbon_copilot.sql` | User-owned conversations, provider provenance, AI usage events, indexes, and RBAC | 005/021 | Phase 8 Copilot | Active | Medium | Apply after 021 |
+| `023_governed_document_grounding.sql` | Private evidence bucket, document integrity/extraction fields, text chunks, indexes, and RLS | 022, Supabase Storage | Evidence Vault and Copilot retrieval | Active | High | Apply after 022 |
+| `024_esg_reporting_studio.sql` | ESG Studio pages, blocks, brand kits, evidence, cross references, AI provenance, permissions, entitlements, and framework templates | 023/015 | Phase 9 reporting runtime | Active | Very high | Apply after 023 |
+| `025_user_enablement_layer.sql` | User-owned task, tour, guide and preference progress with RLS | 024/005 | Phase 10 enablement runtime | Active | Medium | Apply after 024 |
+| `server/seeds/comprehensive_demo_data.sql` | Idempotent user-scoped demo organisation dataset covering operational, intelligence, reporting, and staging workflows | Migrations 000-021, registered auth user | Development and acceptance testing | Optional | High | Keep synchronized with schema changes; never run for production tenants |
+| `server/seeds/demo-import-*.csv` | Data Hub acceptance-test fixtures for all Phase 7 source definitions | Registered facility ID | Development and user acceptance testing | Optional | Low | Keep |
+| `server/seeds/README.md` | Demo seed and import-fixture instructions | Demo seed files | Developers and testers | Active | Low | Keep |
 | `docs/ARCHITECTURE.md` | Phase 1 architecture record | Source tree | Developers | Active but stale | Medium | Refresh after this index |
 | `docs/SUBSCRIPTIONS.md` | Pricing/subscription guide | 007/008/012 | Developers | Active | Medium | Keep |
 | `docs/ENTITLEMENTS.md` | Phase 4 gates guide | 009/013 | Developers | Active | Medium | Keep |
@@ -304,6 +323,9 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `docs/LOCALIZATION_REFERENCE_DATA.md` | Localization, measurement, and reference-data guide | 016 | Developers | Active | High | Keep |
 | `docs/METADATA_PLATFORM.md` | Metadata architecture, API, RBAC, and administration guide | 018 | Developers and organisation admins | Active | High | Keep current as integrations grow |
 | `docs/PHASE7_ENTERPRISE_DATA_PLATFORM.md` | Phase 7 architecture, workflow, endpoints, deployment, and operational boundaries | 019-021 and Data Platform source | Developers and operators | Active | High | Keep current after each connector release |
+| `docs/AI_CARBON_COPILOT.md` | Phase 8 local AI architecture, deployment, security boundaries, APIs, and limitations | 022 and AI source | Developers, security reviewers, and operators | Active | High | Keep current for every provider or retrieval change |
+| `docs/PHASE_9_ESG_REPORTING_STUDIO.md` | Phase 9 features, schema, APIs, governance, exports, and deployment boundaries | 024 and Report Studio source | Developers and operators | Active | Medium | Keep current after reporting releases |
+| `docs/PHASE_10_USER_ENABLEMENT.md` | Phase 10 teaching model, schema, APIs, role behavior and verification | 025 and enablement source | Product, support, developers and operators | Active | Medium | Review against product changes each phase |
 | `docs/COMPLETE_COMPANY_USER_GUIDE.md` | End-to-end company journey from public site through onboarding, ingestion, accounting, intelligence, and reporting | Live application workflows | Customers, admins, and support | Active | High | Validate against every major UI release |
 | `docs/PRICING_RESEARCH.md` | Commercial pricing rationale | External sources | Product team | Active | Low | Refresh quarterly |
 | `docs/CODEBASE_INDEX.md` | This inventory | Source tree | Developers | Active | High | Update after major phase |

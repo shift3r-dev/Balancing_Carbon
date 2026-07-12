@@ -18,6 +18,8 @@ import { createEntitlementRouter } from './server/routes/entitlementRoutes.js';
 import { createReferenceDataRouter } from './server/routes/referenceDataRoutes.js';
 import { createMetadataRouter } from './server/routes/metadataRoutes.js';
 import { createDataPlatformRouter } from './server/routes/dataPlatformRoutes.js';
+import { createAiCopilotRouter } from './server/routes/aiCopilotRoutes.js';
+import { createEnablementRouter } from './server/routes/enablementRoutes.js';
 import { runtimeConfig } from './server/config/runtime.js';
 import { errorHandler } from './server/middleware/errorHandler.js';
 import { requestLogger } from './server/middleware/requestLogger.js';
@@ -47,6 +49,8 @@ app.use('/api', createEntitlementRouter());
 app.use('/api', createReferenceDataRouter());
 app.use('/api', createMetadataRouter());
 app.use('/api', createDataPlatformRouter());
+app.use('/api', createAiCopilotRouter());
+app.use('/api', createEnablementRouter());
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
 

@@ -1,0 +1,2 @@
+Facility,Date,Material,Quantity,Unit,Supplier,Batch,Origin,Recycled Content,Source Document,Notes
+REPLACE_WITH_FACILITY_ID,2026-04-15,Cold rolled steel coil,810,tonne,Demo Steel Supplier,CR-260415,India,24,April purchase invoice.pdf,Primary production material

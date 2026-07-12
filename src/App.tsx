@@ -26,6 +26,7 @@ import {
   FolderClosed,
   Database,
   Info,
+  HelpCircle,
 } from "lucide-react";
 
 // Brand & Modular Components
@@ -43,6 +44,7 @@ import AIAssistantModule from "./components/AIAssistantModule.tsx";
 import SubscriptionSettings from "./components/SubscriptionSettings.tsx";
 import ReportingWorkspace from "./components/ReportingWorkspace.tsx";
 import EntitlementGate from "./components/EntitlementGate.tsx";
+import LearningCentre, { ContextHelpDrawer, FirstRunWelcome, OnboardingWidget } from "./components/UserEnablement.tsx";
 import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
 const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
@@ -85,6 +87,7 @@ export default function App() {
   // Navigation & User session states
   const [currentView, setCurrentView] = useState<ViewState>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [contextHelpOpen, setContextHelpOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(() => {
     return localStorage.getItem("balancing_carbon_session") !== null;
   });
@@ -572,16 +575,16 @@ export default function App() {
 
   const handleAddDocument = async (payload: any) => {
     try {
-      const newDoc = await safeFetchJson("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const newDoc = payload instanceof FormData
+        ? await fetch("/api/documents/upload", { method: "POST", headers: getAuthenticatedHeaders(), body: payload }).then((response) => parseJsonResponse(response, null))
+        : await safeFetchJson("/api/documents", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const createdDocument = unwrapEntity<Document>(newDoc, ["document"]);
       if (createdDocument?.id)
         setDocuments((prev) => [createdDocument, ...prev]);
+      return createdDocument;
     } catch (err) {
       console.error(err);
+      return null;
     }
   };
 
@@ -1088,6 +1091,8 @@ export default function App() {
         className="flex h-screen bg-brand-offwhite overflow-hidden text-brand-charcoal font-sans"
         id="client-dashboard-app"
       >
+        <FirstRunWelcome onNavigate={setCurrentView} onOpenHelp={() => setCurrentView("dashboard-help")} />
+        <ContextHelpDrawer view={currentView} open={contextHelpOpen} onClose={() => setContextHelpOpen(false)} onOpenLearning={() => { setContextHelpOpen(false); setCurrentView("dashboard-help"); }} />
         {/* Navigation Sidebar */}
         <DashboardSidebar
           currentView={currentView}
@@ -1111,6 +1116,13 @@ export default function App() {
 
             <div className="flex items-center gap-3">
               <button
+                onClick={() => setContextHelpOpen(true)}
+                className="border border-brand-border hover:bg-brand-offwhite text-brand-charcoal px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                data-help-id="context-help"
+              >
+                <HelpCircle className="w-4 h-4" /> <span className="hidden sm:inline">Help</span>
+              </button>
+              <button
                 onClick={() => setCurrentView("dashboard-ai-assistant")}
                 className="bg-brand-forest hover:bg-brand-green-sec text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer animate-pulse"
               >
@@ -1129,6 +1141,8 @@ export default function App() {
             ) : (
               <>
                 {currentView === "dashboard-overview" && (
+                  <>
+                  <OnboardingWidget onNavigate={setCurrentView} onOpenHelp={() => setCurrentView("dashboard-help")} />
                   <DashboardOverview
                     organisation={organisation}
                     facilities={facilities}
@@ -1141,7 +1155,7 @@ export default function App() {
                     opportunities={opportunities}
                     projects={projects}
                     onNavigate={setCurrentView}
-                  />
+                  /></>
                 )}
                 {currentView === "dashboard-facilities" && (
                   <FacilityManagement
@@ -1244,6 +1258,7 @@ export default function App() {
                     <EnterpriseDataHub />
                   </Suspense>
                 )}
+                {currentView === "dashboard-help" && <LearningCentre onNavigate={setCurrentView} />}
 
                 {/* Company profile entity updates */}
                 {currentView === "dashboard-company" && renderCompanyProfile()}
@@ -1251,7 +1266,7 @@ export default function App() {
 
                 {/* Smart Chatbot */}
                 {currentView === "dashboard-ai-assistant" && (
-                  <AIAssistantModule />
+                  <AIAssistantModule onNavigate={setCurrentView} />
                 )}
               </>
             )}

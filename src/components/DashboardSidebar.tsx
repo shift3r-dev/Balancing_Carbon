@@ -20,6 +20,7 @@ import {
   Database,
   Gauge,
   Target,
+  CircleHelp,
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
@@ -97,6 +98,7 @@ export default function DashboardSidebar({
     {
       label: "Intelligence",
       items: [
+        { id: "dashboard-help", label: "Help & Learning", icon: CircleHelp },
         {
           id: "dashboard-intelligence",
           label: "Diagnostics",

@@ -10,6 +10,19 @@
   .btn-small { @apply inline-flex items-center gap-1 border border-brand-border rounded px-2 py-1 text-[10px] font-bold; }
   .btn-small-green { @apply inline-flex items-center gap-1 bg-brand-sage text-brand-forest rounded px-2 py-1 text-[10px] font-bold; }
   .btn-small-dark { @apply inline-flex items-center gap-1 bg-brand-charcoal text-white rounded px-2 py-1 text-[10px] font-bold; }
+  .studio-input { @apply w-full border border-brand-border rounded px-2.5 py-2 text-xs bg-white outline-none focus:ring-1 focus:ring-brand-forest disabled:bg-gray-50 disabled:text-gray-400; }
+  .studio-primary { @apply bg-brand-forest text-white rounded px-3 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 hover:bg-brand-green-sec disabled:opacity-40; }
+  .studio-secondary { @apply border border-brand-border bg-white rounded px-3 py-2 text-xs font-bold inline-flex items-center justify-center gap-1.5 hover:bg-brand-offwhite disabled:opacity-40; }
+  .studio-action { @apply bg-white/10 border border-white/20 rounded px-3 py-2 text-xs font-bold inline-flex items-center gap-1.5 hover:bg-white/20 disabled:opacity-40; }
+  .studio-icon-action { @apply w-9 h-9 bg-white/10 border border-white/20 rounded inline-flex items-center justify-center hover:bg-white/20 disabled:opacity-40; }
+  .studio-icon-action svg, .studio-mini svg { @apply w-4 h-4; }
+  .studio-mini { @apply w-8 h-8 border border-brand-border rounded inline-flex items-center justify-center hover:bg-brand-offwhite disabled:opacity-30; }
+  .studio-palette { @apply min-h-9 border border-brand-border rounded px-2 py-1.5 text-[10px] font-bold flex items-center gap-1.5 hover:bg-brand-offwhite disabled:opacity-40; }
+  .studio-status { @apply capitalize text-[9px] font-mono px-2 py-1 rounded bg-brand-sage/40 text-brand-forest; }
+  .studio-inspector-title { @apply text-[10px] font-black uppercase font-mono text-brand-charcoal; }
+  .report-canvas { @apply w-full max-w-[900px] min-h-[720px] mx-auto border border-brand-border rounded-lg p-5 sm:p-8 shadow-sm; }
+  .report-block { @apply relative min-h-10 pl-6 pr-3 py-2 border border-transparent rounded cursor-pointer hover:border-brand-border; }
+  .report-block-active { @apply border-brand-forest ring-1 ring-brand-forest/20; }
 }
 
 @theme {

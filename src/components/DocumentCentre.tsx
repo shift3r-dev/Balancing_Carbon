@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { 
+import {
   FolderClosed, FileText, Upload, Trash2, Search, Filter, 
-  ShieldCheck, Info, CheckCircle2, ChevronRight, AlertCircle, X 
+  ShieldCheck, AlertCircle, X, Download, LoaderCircle
 } from 'lucide-react';
 import { Document } from '../types.ts';
+import { getAuthenticatedHeaders } from '../services/apiClient.ts';
 
 interface DocProps {
   documents: Document[];
-  onAddDocument: (doc: any) => void;
+  onAddDocument: (doc: any) => Promise<Document | null | undefined>;
   onDeleteDocument: (id: string) => void;
 }
 
@@ -17,34 +18,28 @@ export default function DocumentCentre({ documents, onAddDocument, onDeleteDocum
   
   // Upload state
   const [showUploadForm, setShowUploadForm] = useState(false);
-  const [docName, setDocName] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState('Environmental Permit');
   const [notes, setNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState('');
 
   const categories = ['All', 'Environmental Permit', 'Energy Invoice', 'Social Code', 'Audit Report', 'General Policy'];
 
-  const handleUpload = (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docName) {
-      alert('Please enter document filename.');
+    if (!file) {
+      setUploadMessage('Select a supported evidence file.');
       return;
     }
-
-    const mockSizes = ['1.2 MB', '840 KB', '2.4 MB', '4.1 MB', '1.6 MB'];
-    const randomSize = mockSizes[Math.floor(Math.random() * mockSizes.length)];
-
-    onAddDocument({
-      name: docName.endsWith('.pdf') ? docName : `${docName}.pdf`,
-      category,
-      size: randomSize,
-      uploadDate: new Date().toISOString().split('T')[0],
-      isVerified: true
-    });
-
-    setDocName('');
-    setNotes('');
-    setShowUploadForm(false);
+    setUploading(true); setUploadMessage('Uploading and extracting evidence...');
+    const form = new FormData(); form.append('file', file); form.append('category', category); form.append('notes', notes);
+    const created = await onAddDocument(form); setUploading(false);
+    if (created) { setFile(null); setNotes(''); setUploadMessage('Evidence stored and extraction completed.'); setShowUploadForm(false); }
+    else setUploadMessage('Upload failed. Check the file type, plan limit, and server log.');
   };
+
+  const downloadDocument = async (id: string) => { const response = await fetch(`/api/documents/${id}/download`, { headers: getAuthenticatedHeaders() }); const payload = await response.json().catch(() => ({})); if (!response.ok || !payload.url) { setUploadMessage(payload.error ?? 'Unable to create a secure download link.'); return; } const anchor = window.document.createElement('a'); anchor.href = payload.url; anchor.target = '_blank'; anchor.rel = 'noreferrer'; anchor.click(); };
 
   const filteredDocs = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -86,13 +81,12 @@ export default function DocumentCentre({ documents, onAddDocument, onDeleteDocum
 
           <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             <div>
-              <label className="block font-mono text-gray-500 mb-1">Document Filename (with .pdf) *</label>
+              <label className="block font-mono text-gray-500 mb-1">Evidence File *</label>
               <input
-                type="text"
+                type="file"
                 required
-                placeholder="e.g. MPCB_Consent_Apex_2026.pdf"
-                value={docName}
-                onChange={(e) => setDocName(e.target.value)}
+                accept=".pdf,.docx,.txt,.csv,.md,.json"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite"
               />
             </div>
@@ -122,13 +116,14 @@ export default function DocumentCentre({ documents, onAddDocument, onDeleteDocum
                 />
               </div>
               <button
-                type="submit"
+                type="submit" disabled={uploading}
                 className="bg-brand-forest hover:bg-brand-green-sec text-white px-5 py-2.5 rounded font-mono font-bold cursor-pointer"
               >
-                Commit File
+                {uploading ? <LoaderCircle className="w-4 h-4 animate-spin" /> : 'Store File'}
               </button>
             </div>
           </form>
+          {uploadMessage ? <p className="mt-3 text-xs text-gray-600">{uploadMessage}</p> : null}
 
           {/* Secure vault notification */}
           <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg text-[10px] font-mono text-brand-forest leading-relaxed flex gap-2 items-start">
@@ -192,7 +187,7 @@ export default function DocumentCentre({ documents, onAddDocument, onDeleteDocum
                       {doc.category}
                     </span>
                     <span>Uploaded: {doc.uploadDate}</span>
-                    <span>Size: {doc.size}</span>
+                  <span>Size: {doc.size}</span><span>Extraction: {doc.extractionStatus ?? 'not-requested'}</span>
                   </div>
                 </div>
               </div>
@@ -202,6 +197,7 @@ export default function DocumentCentre({ documents, onAddDocument, onDeleteDocum
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>Audit Verified</span>
                 </div>
+                {doc.storagePath ? <button onClick={() => void downloadDocument(doc.id)} className="p-2 text-gray-500 hover:text-brand-forest hover:bg-white rounded-lg" title="Download stored evidence"><Download className="w-4 h-4" /></button> : null}
                 <button
                   onClick={() => {
                     if (confirm(`Remove ${doc.name} from active tenant compliance index?`)) {

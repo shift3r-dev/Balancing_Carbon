@@ -109,6 +109,8 @@ export interface Document {
   category: 'Electricity Bill' | 'Fuel Invoice' | 'Carbon Report' | 'ESG Policy' | 'Environmental Certification' | 'Energy Audit' | 'OEM Questionnaire' | 'Compliance Evidence' | 'Production Record' | 'Other';
   uploadDate: string; facilityId: string; period: string; size: string;
   aiStatus: 'Processed' | 'Processing' | 'Failed'; evidenceUsage: string;
+  storagePath?: string; mimeType?: string; byteSize?: number; sha256?: string;
+  extractionStatus?: 'not-requested' | 'processing' | 'completed' | 'empty' | 'failed' | 'unsupported'; extractionError?: string; extractedAt?: string;
 }
 export interface Report {
   id: string; organisationId: string; title: string;
@@ -176,4 +178,4 @@ export type ViewState =
   | 'dashboard-energy' | 'dashboard-emissions-scope1' | 'dashboard-emissions-scope2' | 'dashboard-emissions-scope3'
   | 'dashboard-calculator' | 'dashboard-intelligence' | 'dashboard-opportunities' | 'dashboard-scenarios' | 'dashboard-projects'
   | 'dashboard-esg' | 'dashboard-questionnaires' | 'dashboard-documents' | 'dashboard-reports'
-  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform';
+  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform' | 'dashboard-help';

@@ -82,6 +82,8 @@ export const mapDocument = (d: any) => ({
   size: d.size ?? '',
   aiStatus: d.ai_status ?? 'Processed',
   evidenceUsage: d.evidence_usage ?? '',
+  storagePath: d.storage_path ?? '', mimeType: d.mime_type ?? '', byteSize: Number(d.byte_size ?? 0), sha256: d.sha256 ?? '',
+  extractionStatus: d.extraction_status ?? 'not-requested', extractionError: d.extraction_error ?? '', extractedAt: d.extracted_at ?? '',
 });
 
 export const mapReport = (r: any) => ({
