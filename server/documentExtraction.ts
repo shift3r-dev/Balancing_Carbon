@@ -1,4 +1,3 @@
-import { PDFParse } from 'pdf-parse';
 import mammoth from 'mammoth';
 
 const textTypes = new Set(['text/plain', 'text/csv', 'text/markdown', 'application/json']);
@@ -18,6 +17,9 @@ export async function extractDocumentText(buffer: Buffer, mimeType: string) {
     const result = await mammoth.extractRawText({ buffer }); return normalize(result.value);
   }
   if (mimeType === 'application/pdf') {
+    // pdf-parse initializes PDF.js browser rendering globals when imported. Load it
+    // only for PDF extraction so serverless API bootstrap does not require DOMMatrix.
+    const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     try { const result = await parser.getText(); return normalize(result.text); }
     finally { await parser.destroy(); }
