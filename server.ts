@@ -24,6 +24,7 @@ import { createAnalyticsRouter } from './server/routes/analyticsRoutes.js';
 import { createSustainabilityRouter } from './server/routes/sustainabilityRoutes.js';
 import { createCollaborationRouter } from './server/routes/collaborationRoutes.js';
 import { createPublicPortalRouter } from './server/routes/publicPortalRoutes.js';
+import { createMarketplaceRouter } from './server/routes/marketplaceRoutes.js';
 import { runtimeConfig } from './server/config/runtime.js';
 import { errorHandler } from './server/middleware/errorHandler.js';
 import { requestLogger } from './server/middleware/requestLogger.js';
@@ -59,6 +60,7 @@ app.use('/api', createAnalyticsRouter());
 app.use('/api', createSustainabilityRouter());
 app.use('/api', createCollaborationRouter());
 app.use('/api', createPublicPortalRouter());
+app.use('/api', createMarketplaceRouter());
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
 

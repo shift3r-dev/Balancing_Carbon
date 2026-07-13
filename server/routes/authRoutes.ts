@@ -85,23 +85,32 @@ export function createAuthRouter() {
   });
 
   router.post('/login', async (req, res) => {
-    const email = str(req.body?.email).toLowerCase(), password = req.body?.password;
-    if (!email || typeof password !== 'string') return res.status(400).json({ error: 'Email and password are required.' });
-    const { data: auth, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
-    if (error || !auth.user || !auth.session) {
-      await auditAuthEvent({ eventType: 'login_failed', metadata: { email }, ipAddress: req.ip, userAgent: req.get('user-agent') });
-      return res.status(401).json({ error: 'Invalid email or password.' });
+    try {
+      const email = str(req.body?.email).toLowerCase(), password = req.body?.password;
+      if (!email || typeof password !== 'string') return res.status(400).json({ error: 'Email and password are required.' });
+      const { data: auth, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
+      if (error || !auth.user || !auth.session) {
+        await auditAuthEvent({ eventType: 'login_failed', metadata: { email }, ipAddress: req.ip, userAgent: req.get('user-agent') });
+        return res.status(401).json({ error: 'Invalid email or password.' });
+      }
+      let profile;
+      try { profile = await getProfile(auth.user.id); }
+      catch { return res.status(403).json({ error: 'Your identity is valid, but its organisation profile is missing. Ask an administrator to restore the profile.' }); }
+      const { data: org, error: orgError } = await supabaseAdmin.from('organisations').select('*').eq('id', profile.organisation_id).single();
+      if (orgError || !org) return res.status(403).json({ error: 'Your identity is valid, but its organisation is unavailable.' });
+      const { error: loginUpdateError } = await supabaseAdmin.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', auth.user.id);
+      if (loginUpdateError) console.warn(JSON.stringify({ level: 'warn', event: 'last_login_update_failed', userId: auth.user.id, message: loginUpdateError.message }));
+      await auditAuthEvent({ userId: auth.user.id, organisationId: profile.organisation_id, eventType: 'login', ipAddress: req.ip, userAgent: req.get('user-agent') });
+      return res.json({
+        authenticated: true, accessToken: auth.session.access_token, refreshToken: auth.session.refresh_token,
+        expiresAt: auth.session.expires_at,
+        user: { id: auth.user.id, name: profile.full_name, email: auth.user.email, role: profile.role, organisationId: profile.organisation_id },
+        organisation: mapOrganisation(org),
+      });
+    } catch (error) {
+      console.error(JSON.stringify({ level: 'error', event: 'login_failed_unexpectedly', message: error instanceof Error ? error.message : 'unknown' }));
+      return res.status(500).json({ error: 'Login service failed unexpectedly. Please retry; if it continues, check the server log using the request ID.', requestId: res.getHeader('x-request-id') });
     }
-    const profile = await getProfile(auth.user.id);
-    const { data: org } = await supabaseAdmin.from('organisations').select('*').eq('id', profile.organisation_id).single();
-    await supabaseAdmin.from('profiles').update({ last_login_at: new Date().toISOString() }).eq('id', auth.user.id);
-    await auditAuthEvent({ userId: auth.user.id, organisationId: profile.organisation_id, eventType: 'login', ipAddress: req.ip, userAgent: req.get('user-agent') });
-    return res.json({
-      authenticated: true, accessToken: auth.session.access_token, refreshToken: auth.session.refresh_token,
-      expiresAt: auth.session.expires_at,
-      user: { id: auth.user.id, name: profile.full_name, email: auth.user.email, role: profile.role, organisationId: profile.organisation_id },
-      organisation: org ? mapOrganisation(org) : null,
-    });
   });
 
   router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {

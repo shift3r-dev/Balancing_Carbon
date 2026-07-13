@@ -23,6 +23,7 @@ import {
   CircleHelp,
   Users,
   Globe2,
+  Store,
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
@@ -151,6 +152,7 @@ export default function DashboardSidebar({
         },
         { id: "dashboard-metadata", label: "Metadata Studio", icon: Database },
         { id: "dashboard-data-platform", label: "Data Hub", icon: Database },
+        { id: "dashboard-marketplace", label: "Marketplace", icon: Store },
         { id: "dashboard-settings", label: "System Settings", icon: Settings },
         { id: "dashboard-settings", label: "Audit Logs", icon: ClipboardList, badge: "Soon" },
         { id: "dashboard-collaboration", label: "Notifications", icon: Bell },

@@ -59,6 +59,7 @@ const SustainabilityIntelligence = lazy(() => import("./components/Sustainabilit
 const CollaborationCenter = lazy(() => import("./components/CollaborationCenter.tsx"));
 const PublicPortalAdmin = lazy(() => import("./components/PublicPortalAdmin.tsx"));
 const PublicESGPortal = lazy(() => import("./components/PublicESGPortal.tsx"));
+const MarketplaceHub = lazy(() => import("./components/MarketplaceHub.tsx"));
 
 // Shared interfaces
 import {
@@ -658,16 +659,22 @@ export default function App() {
       });
 
       if (!res.ok) {
-        const errData = await res
-          .json()
-          .catch(() => ({ error: "Failed to authenticate session." }));
+        const responseText = await res.text();
+        let errData: any = null;
+        try { errData = responseText ? JSON.parse(responseText) : null; } catch { errData = null; }
+        const requestId = res.headers.get("x-request-id");
         setLoginError(
-          errData.error || "Invalid corporate email or secure password.",
+          errData?.error || `Login service returned an unexpected response (${res.status})${requestId ? ` · Request ${requestId}` : ""}.`,
         );
         return;
       }
 
-      const session = await res.json();
+      const responseText = await res.text();
+      const session = responseText ? JSON.parse(responseText) : null;
+      if (!session?.authenticated || !session?.accessToken || !session?.user) {
+        setLoginError("Login response did not contain a valid authenticated session.");
+        return;
+      }
       localStorage.setItem("balancing_carbon_session", JSON.stringify(session));
       setCurrentUser(session.user);
       setOrganisation(session.organisation);
@@ -1279,6 +1286,13 @@ export default function App() {
                   <EntitlementGate entitlement="public.portal" title="Public ESG Portal">
                     <Suspense fallback={<DashboardModuleLoader label="Loading Public ESG Portal administration..." />}>
                       <PublicPortalAdmin />
+                    </Suspense>
+                  </EntitlementGate>
+                )}
+                {currentView === "dashboard-marketplace" && (
+                  <EntitlementGate entitlement="marketplace.catalog" title="Marketplace & Integrations">
+                    <Suspense fallback={<DashboardModuleLoader label="Loading Marketplace..." />}>
+                      <MarketplaceHub />
                     </Suspense>
                   </EntitlementGate>
                 )}

@@ -1,6 +1,6 @@
 # Codebase Index
 
-Last reviewed: 2026-07-13 after formal Phase 13 Public ESG Portal. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
+Last reviewed: 2026-07-13 after formal Phase 14 Marketplace and Integrations. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
 
 ## Folder Tree
 
@@ -87,6 +87,7 @@ flowchart LR
 | Enterprise reference data | Generic categories, values, search, hierarchy and configuration under `/api/reference/*` | reference data registries |
 | Workflow and collaboration | `GET /api/collaboration/workspace`; create/update tasks, comments, reviews, evidence requests, document approvals and notifications under `/api/collaboration/*`; `POST /api/collaboration/escalations/run` | Phase 12 collaboration tables, workflow rules, notification and email outbox helpers |
 | Public ESG Portal | Anonymous `GET /api/public/portals/:slug`; authenticated configuration, assets, publish and withdraw under `/api/portal/admin/*` | Public portal snapshot, publication history, approved tenant aggregates |
+| Marketplace and developer API | `GET /api/marketplace/workspace`; install/uninstall and credential/webhook administration under `/api/marketplace/*`; OpenAPI and scoped developer endpoints under `/api/developer/*` | Marketplace catalog/installations, hashed API credentials, webhook definitions, usage audit |
 
 ## Database Table Index
 
@@ -104,6 +105,7 @@ flowchart LR
 | Reporting and compliance | `compliance_frameworks`, `report_templates`, `report_versions`, `report_sections`, `report_evidence_links`, `report_approvals`, `report_exports`, `report_schedules` | Active after migrations 011 and 015 |
 | Workflow and collaboration | `collaboration_tasks`, `collaboration_comments`, `review_cycles`, `evidence_requests`, `collaboration_notifications`, `collaboration_activity_feed`, `document_approvals`, `collaboration_email_outbox` | Active after migration 028 |
 | Public ESG Portal | `public_esg_portals`, `public_portal_assets`, `public_portal_publications` | Active after migration 029 |
+| Marketplace and integrations | `marketplace_items`, `marketplace_installations`, `developer_api_credentials`, `webhook_subscriptions`, `webhook_deliveries`, `developer_api_usage` | Active after migration 030 |
 | Legacy enterprise foundation | `feature_flags`, `organization_feature_flags`, `usage_metrics`, `licenses`, `system_settings` | Present but unused by runtime |
 
 ## React Component Index
@@ -133,6 +135,7 @@ flowchart LR
 | `AsymmetricInfinityLogo.tsx` | Shared brand mark | Active |
 | `CollaborationCenter.tsx` | Tasks, comments, mentions, reviews, evidence, approvals, notifications, escalations and activity trail | Active, Professional-gated |
 | `PublicPortalAdmin.tsx`, `PublicESGPortal.tsx` | Controlled portal publication and anonymous responsive disclosure experience | Active, Enterprise-gated administration |
+| `MarketplaceHub.tsx` | Catalog, installations, scoped credentials, webhooks, usage and API contract workspace | Active, Professional catalog and Enterprise developer features |
 
 ## Services, Hooks, Middleware, Context
 
@@ -150,6 +153,7 @@ flowchart LR
 | Service | `server/localizationService.ts` | Organization/user localization settings and catalogs | Active |
 | Domain rules | `server/workflowRules.ts` | Task transitions, overdue evaluation and tenant-member mention validation | Active |
 | Domain rules | `server/publicPortalEngine.ts` | Slug/section normalization, publication readiness and privacy-safe supplier aggregation | Active |
+| Security rules | `server/marketplaceSecurity.ts` | One-time secrets, hashing, scope/event allow-lists, HTTPS validation and non-executable manifests | Active |
 | Service | `server/services/foundationServices.ts` | Empty Phase 1 interfaces | Unused; refactor into real services or remove |
 | Middleware | `server/auth.ts` | Bearer auth and RBAC gates | Active |
 | Middleware | `server/middleware/entitlements.ts` | License, entitlement, and limit enforcement | Active |
@@ -228,6 +232,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `src/components/CollaborationCenter.tsx` | Governed collaboration workspace for tasks, reviews, evidence, approvals, comments, activity and notifications | Collaboration API, AuthContext | Dashboard shell | Active | High | Split workflow tabs when domain-specific forms expand |
 | `src/components/PublicPortalAdmin.tsx` | Enterprise portal configuration, section/resource selection and publication controls | Public Portal API, AuthContext | Dashboard shell | Active | High | Add preview comparison before publication when adoption grows |
 | `src/components/PublicESGPortal.tsx` | Anonymous responsive ESG, carbon, target, governance, report and supplier-aggregate portal | Published snapshot API | `/portal/:slug` App route | Active | High | Keep snapshot schema versioned and backward-compatible |
+| `src/components/MarketplaceHub.tsx` | Marketplace catalog, installations, developer credentials, webhook definitions and API contract | Marketplace API, AuthContext, entitlements | Dashboard shell | Active | High | Split developer and catalog tabs if package administration expands |
 
 ### Backend core and services
 
@@ -302,6 +307,9 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `server/publicPortalEngine.ts` | Public slug, section, readiness and supplier privacy rules | Pure TypeScript | Public portal router/tests | Active | Low | Keep publication privacy rules pure |
 | `server/publicPortalEngine.test.ts` | Public portal normalization, readiness and supplier privacy tests | Portal engine | `npm run test:portal` | Active | Low | Add snapshot compatibility fixtures as schema versions evolve |
 | `server/routes/publicPortalRoutes.ts` | Public snapshot read and tenant portal administration/publication endpoints | Supabase, auth, entitlements, portal engine | `server.ts` | Active | High | Extract snapshot builder when additional disclosure frameworks are added |
+| `server/marketplaceSecurity.ts` | Secret generation/hash comparison, scope/event normalization, webhook URL and manifest safety | Node crypto | Marketplace router/tests | Active | Medium | Move rate limiting to a distributed store before horizontal scaling |
+| `server/marketplaceSecurity.test.ts` | Credential, scope, webhook and manifest safety tests | Marketplace security | `npm run test:marketplace` | Active | Low | Add API-key route integration tests with a disposable database |
+| `server/routes/marketplaceRoutes.ts` | Catalog/installations, developer keys, webhook definitions, OpenAPI and scoped API-key endpoint | Auth, entitlements, Supabase, security rules | `server.ts` | Active | Very high | Split developer authentication and marketplace administration routers |
 | `server/routes/subscriptionRoutes.ts` | Subscription endpoints | Subscription service | `server.ts` | Active | Low | Keep |
 | `server/middleware/entitlements.ts` | License/feature/limit gates | Entitlement service | Protected writes | Active | Medium | Keep |
 | `server/middleware/errorHandler.ts` | Final error response | Express | `server.ts` | Active | Low | Keep |
@@ -343,6 +351,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `027_sustainability_intelligence_platform.sql` | Targets, pathways, milestones, suppliers, plan snapshots, RBAC and entitlements | 026/020 | Formal Phase 11 sustainability runtime | Active | High | Apply after 026 |
 | `028_workflow_collaboration.sql` | Tasks, comments, review cycles, evidence requests, document approvals, notifications, activity feed, email outbox, RBAC and entitlement | 027/005 | Formal Phase 12 collaboration runtime | Active | High | Apply after 027; connect an outbox worker only with deployment credentials |
 | `029_public_esg_portal.sql` | Public portal configuration, resource selection, versioned snapshots, RBAC and Enterprise entitlement | 028/027/011 | Formal Phase 13 public disclosure runtime | Active | High | Apply after 028; never add private storage URLs to snapshots |
+| `030_marketplace_integrations.sql` | Marketplace catalog/installations, hashed credentials, webhook definitions/deliveries, usage, RBAC and entitlements | 029/019/009 | Formal Phase 14 integration runtime | Active | High | Apply after 029; provision external workers and vaults separately |
 | `server/seeds/comprehensive_demo_data.sql` | Idempotent user-scoped demo organisation dataset covering operational, intelligence, reporting, and staging workflows | Migrations 000-021, registered auth user | Development and acceptance testing | Optional | High | Keep synchronized with schema changes; never run for production tenants |
 | `server/seeds/demo-import-*.csv` | Data Hub acceptance-test fixtures for all Phase 7 source definitions | Registered facility ID | Development and user acceptance testing | Optional | Low | Keep |
 | `server/seeds/README.md` | Demo seed and import-fixture instructions | Demo seed files | Developers and testers | Active | Low | Keep |
@@ -361,6 +370,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `docs/PHASE_11_SUSTAINABILITY_INTELLIGENCE.md` | Formal Phase 11 planning modules, methodologies, schema, APIs and boundaries | 027 and sustainability source | Product, sustainability, engineering and assurance | Active | High | Version every methodology change |
 | `docs/PHASE_12_WORKFLOW_COLLABORATION.md` | Formal Phase 12 workflow model, deployment, security, operating flow and email boundary | 028 and collaboration source | Product, engineering, security and operators | Active | Medium | Update when statuses or delivery automation change |
 | `docs/PHASE_13_PUBLIC_ESG_PORTAL.md` | Formal Phase 13 publication boundary, deployment, security, capabilities and verification | 029 and public portal source | Product, communications, sustainability, security and operators | Active | Medium | Review every public snapshot schema change |
+| `docs/PHASE_14_MARKETPLACE_INTEGRATIONS.md` | Formal Phase 14 marketplace, developer API, security boundaries, deployment and production backlog | 030 and marketplace source | Engineering, security, integrations and operators | Active | High | Update with every external adapter or webhook worker release |
 | `docs/COMPLETE_COMPANY_USER_GUIDE.md` | End-to-end company journey from public site through onboarding, ingestion, accounting, intelligence, and reporting | Live application workflows | Customers, admins, and support | Active | High | Validate against every major UI release |
 | `docs/PRICING_RESEARCH.md` | Commercial pricing rationale | External sources | Product team | Active | Low | Refresh quarterly |
 | `docs/CODEBASE_INDEX.md` | This inventory | Source tree | Developers | Active | High | Update after major phase |
