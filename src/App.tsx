@@ -91,7 +91,9 @@ function DashboardModuleLoader({ label }: { label: string }) {
 
 export default function App() {
   // Navigation & User session states
-  const [currentView, setCurrentView] = useState<ViewState>("home");
+  const [currentView, setCurrentView] = useState<ViewState>(() =>
+    localStorage.getItem("balancing_carbon_session") ? "dashboard-overview" : "home",
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardNavOpen, setDashboardNavOpen] = useState(false);
   const [contextHelpOpen, setContextHelpOpen] = useState(false);
