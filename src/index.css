@@ -443,6 +443,7 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 760px) {
   #public-website header {
     height: 68px;
+    min-height: 68px;
     padding-inline: 1rem;
   }
 
@@ -536,5 +537,150 @@ input:focus, select:focus, textarea:focus {
 
   #client-dashboard-app > div:first-child > div:nth-of-type(3) button {
     min-width: 58px;
+  }
+}
+
+/* Phase 15: unified enterprise application system */
+:root {
+  --app-surface: #ffffff;
+  --app-surface-subtle: #f3f6f2;
+  --app-shadow-sm: 0 1px 2px rgba(24, 45, 34, 0.05), 0 8px 24px rgba(24, 45, 34, 0.04);
+  --app-shadow-lg: 0 24px 64px rgba(24, 45, 34, 0.14);
+  --app-control-height: 2.5rem;
+}
+
+::selection { background: var(--color-brand-sage); color: var(--color-brand-charcoal); }
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-brand-forest);
+  outline-offset: 2px;
+}
+
+:where(button, [role="button"]) { -webkit-tap-highlight-color: transparent; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#client-dashboard-app .dashboard-sidebar {
+  flex: none;
+  height: 100svh;
+  z-index: 60;
+}
+
+#client-dashboard-app .dashboard-nav-close,
+#client-dashboard-app .dashboard-menu-button,
+.dashboard-nav-backdrop { display: none; }
+
+#client-dashboard-app .dashboard-workspace-title > span { display: none; }
+
+#client-dashboard-app main > :where(div, section) {
+  animation: pageIn 220ms ease-out both;
+}
+
+#client-dashboard-app main :where(.bg-white.border, section.bg-white, article.bg-white) {
+  box-shadow: var(--app-shadow-sm);
+}
+
+#client-dashboard-app main :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: var(--app-control-height);
+  border-color: var(--color-brand-border);
+}
+
+#client-dashboard-app main :where(input, select, textarea):disabled {
+  cursor: not-allowed;
+  background: var(--app-surface-subtle);
+}
+
+#client-dashboard-app main :where(button, a) { min-height: 2.25rem; }
+#client-dashboard-app main :where(button, a):disabled { cursor: not-allowed; }
+
+#client-dashboard-app main :where(.overflow-x-auto, .overflow-auto) {
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+#client-dashboard-app main table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#client-dashboard-app main th {
+  background: rgba(247, 248, 244, 0.97);
+  color: #526058;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+}
+
+#client-dashboard-app main :where(th, td) { padding: 0.75rem; }
+#client-dashboard-app main tbody tr:hover { background: rgba(221, 232, 223, 0.22); }
+
+@media (max-width: 900px) {
+  #client-dashboard-app { padding-bottom: 0; }
+
+  #client-dashboard-app > .dashboard-sidebar {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(19rem, 88vw) !important;
+    height: 100svh;
+    border-top: 0;
+    border-right: 1px solid var(--color-brand-border);
+    overflow: hidden;
+    transform: translateX(-105%);
+    box-shadow: var(--app-shadow-lg);
+  }
+
+  #client-dashboard-app > .dashboard-sidebar.dashboard-sidebar-open { transform: translateX(0); }
+  #client-dashboard-app .dashboard-sidebar > div { display: flex; }
+  #client-dashboard-app .dashboard-sidebar > div:nth-of-type(3) { display: block; }
+  #client-dashboard-app .dashboard-sidebar .sidebar-collapse { display: none; }
+  #client-dashboard-app .dashboard-nav-close,
+  #client-dashboard-app .dashboard-menu-button { display: inline-flex; }
+
+  .dashboard-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    border: 0;
+    background: rgba(21, 30, 25, 0.46);
+    backdrop-filter: blur(2px);
+  }
+
+  #client-dashboard-app .dashboard-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+@media (max-width: 640px) {
+  #client-dashboard-app main { padding: 0.75rem; }
+  #client-dashboard-app main > :where(div, section) { max-width: 100%; }
+  #client-dashboard-app main :where(.p-8, .p-10) { padding: 1rem; }
+  #client-dashboard-app main :where(.gap-6, .gap-8) { gap: 1rem; }
+  #client-dashboard-app main :where(.flex.justify-between) { flex-wrap: wrap; }
+  #client-dashboard-app main table { min-width: 640px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

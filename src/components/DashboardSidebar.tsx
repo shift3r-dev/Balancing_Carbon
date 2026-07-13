@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -24,6 +24,8 @@ import {
   Users,
   Globe2,
   Store,
+  Search,
+  X,
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
@@ -43,6 +45,9 @@ interface SidebarProps {
   onViewChange: (view: ViewState) => void;
   onLogout: () => void;
   user: SidebarUser | null;
+  organisation?: { id?: string; name?: string } | null;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export default function DashboardSidebar({
@@ -50,8 +55,12 @@ export default function DashboardSidebar({
   onViewChange,
   onLogout,
   user,
+  organisation,
+  mobileOpen = false,
+  onMobileClose,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [query, setQuery] = useState("");
   const displayName = user?.name || user?.full_name || "User";
   const displayEmail = user?.email || "";
 
@@ -160,9 +169,25 @@ export default function DashboardSidebar({
     },
   ];
 
+  const visibleGroups = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return menuItems;
+    return menuItems
+      .map((group) => ({ ...group, items: group.items.filter((item) => `${group.label} ${item.label}`.toLowerCase().includes(normalized)) }))
+      .filter((group) => group.items.length);
+  }, [query]);
+
+  const navigate = (view: ViewState) => {
+    onViewChange(view);
+    onMobileClose?.();
+  };
+
   return (
-    <div
-      className={`bg-white text-brand-charcoal flex flex-col border-r border-brand-border transition-all duration-300 relative ${
+    <>
+    {mobileOpen && <button type="button" aria-label="Close navigation" onClick={onMobileClose} className="dashboard-nav-backdrop" />}
+    <aside
+      aria-label="Dashboard navigation"
+      className={`dashboard-sidebar bg-white text-brand-charcoal flex flex-col border-r border-brand-border transition-all duration-300 relative ${mobileOpen ? "dashboard-sidebar-open" : ""} ${
         collapsed ? "w-20" : "w-64"
       }`}
     >
@@ -170,7 +195,8 @@ export default function DashboardSidebar({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-10 bg-brand-forest text-white w-6 h-6 rounded-full flex items-center justify-center border border-brand-border/20 shadow-md hover:bg-brand-green-sec cursor-pointer z-50"
+        className="sidebar-collapse absolute -right-3 top-10 bg-brand-forest text-white w-6 h-6 rounded-full flex items-center justify-center border border-brand-border/20 shadow-md hover:bg-brand-green-sec cursor-pointer z-50"
+        aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
       >
         {collapsed ? (
           <ChevronRight className="w-4 h-4" />
@@ -188,6 +214,7 @@ export default function DashboardSidebar({
         ) : (
           <AsymmetricInfinityLogo size="sm" />
         )}
+        <button type="button" onClick={onMobileClose} aria-label="Close navigation" className="dashboard-nav-close studio-mini"><X /></button>
       </div>
 
       {/* Current Tenant Banner */}
@@ -197,18 +224,20 @@ export default function DashboardSidebar({
             ORGANISATION
           </div>
           <div className="text-xs font-semibold text-brand-charcoal mt-0.5 truncate">
-            Apex Precision Components
+            {organisation?.name || "Organisation workspace"}
           </div>
           <div className="text-[9px] font-mono text-brand-forest mt-0.5">
-            ID: org-apex | Multi-Tenant
+            ID: {organisation?.id || user?.organisationId || user?.organisation_id || "Pending"}
           </div>
         </div>
       )}
 
+      {!collapsed && <div className="px-3 pt-3"><label className="relative block"><span className="sr-only">Search navigation</span><Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a workspace" className="w-full h-9 pl-9 pr-3 bg-brand-offwhite border border-brand-border rounded text-xs outline-none focus:border-brand-forest" /></label></div>}
+
       {/* Sidebar Navigation Menu */}
       <div className="flex-1 overflow-y-auto px-2 py-4 space-y-6">
-        {menuItems.map((group, groupIdx) => (
-          <div key={groupIdx} className="space-y-1">
+        {visibleGroups.map((group) => (
+          <div key={group.label} className="space-y-1">
             {!collapsed && (
               <span className="px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-2 font-mono">
                 {group.label}
@@ -219,9 +248,9 @@ export default function DashboardSidebar({
               const isActive = currentView === item.id;
               return (
                 <button
-                  key={item.id}
+                  key={`${group.label}-${item.label}`}
                   type="button"
-                  onClick={() => onViewChange(item.id as ViewState)}
+                  onClick={() => navigate(item.id as ViewState)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all group relative ${
                     isActive
                       ? "bg-brand-sage text-brand-forest font-semibold"
@@ -291,6 +320,7 @@ export default function DashboardSidebar({
           </button>
         </div>
       </div>
-    </div>
+    </aside>
+    </>
   );
 }

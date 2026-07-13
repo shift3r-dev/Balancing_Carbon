@@ -93,6 +93,7 @@ export default function App() {
   // Navigation & User session states
   const [currentView, setCurrentView] = useState<ViewState>("home");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardNavOpen, setDashboardNavOpen] = useState(false);
   const [contextHelpOpen, setContextHelpOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(() => {
     return localStorage.getItem("balancing_carbon_session") !== null;
@@ -1096,6 +1097,33 @@ export default function App() {
     );
   };
 
+  const workspaceMeta: Partial<Record<ViewState, { title: string; section: string }>> = {
+    "dashboard-overview": { title: "Command Center", section: "Overview" },
+    "dashboard-company": { title: "Organisation Profile", section: "Command Center" },
+    "dashboard-facilities": { title: "Facilities", section: "Command Center" },
+    "dashboard-calculator": { title: "Carbon Calculator", section: "Carbon Inventory" },
+    "dashboard-energy": { title: "Activity Ledgers", section: "Carbon Inventory" },
+    "dashboard-emissions-scope1": { title: "Scope 1 Inventory", section: "Carbon Inventory" },
+    "dashboard-emissions-scope2": { title: "Scope 2 Inventory", section: "Carbon Inventory" },
+    "dashboard-emissions-scope3": { title: "Scope 3 Inventory", section: "Carbon Inventory" },
+    "dashboard-intelligence": { title: "Carbon Intelligence", section: "Intelligence" },
+    "dashboard-analytics": { title: "Analytics Studio", section: "Intelligence" },
+    "dashboard-sustainability": { title: "Sustainability Planner", section: "Intelligence" },
+    "dashboard-collaboration": { title: "Collaboration", section: "Reporting & Evidence" },
+    "dashboard-public-portal": { title: "Public ESG Portal", section: "Reporting & Evidence" },
+    "dashboard-reports": { title: "Reporting Studio", section: "Reporting & Evidence" },
+    "dashboard-documents": { title: "Document Vault", section: "Reporting & Evidence" },
+    "dashboard-questionnaires": { title: "OEM Questionnaires", section: "Reporting & Evidence" },
+    "dashboard-esg": { title: "ESG Readiness", section: "Reporting & Evidence" },
+    "dashboard-ai-assistant": { title: "Carbon Copilot", section: "System" },
+    "dashboard-metadata": { title: "Metadata Studio", section: "System" },
+    "dashboard-data-platform": { title: "Enterprise Data Hub", section: "System" },
+    "dashboard-marketplace": { title: "Marketplace", section: "System" },
+    "dashboard-settings": { title: "Subscription & Settings", section: "System" },
+    "dashboard-help": { title: "Help & Learning", section: "Support" },
+  };
+  const activeWorkspace = workspaceMeta[currentView] ?? { title: "Balancing Carbon", section: "Workspace" };
+
   const publicPortalMatch = window.location.pathname.match(/^\/portal\/([a-z0-9-]+)\/?$/i);
   if (publicPortalMatch) {
     return <Suspense fallback={<DashboardModuleLoader label="Loading public ESG portal..." />}><PublicESGPortal slug={publicPortalMatch[1]} /></Suspense>;
@@ -1116,19 +1144,27 @@ export default function App() {
           onViewChange={setCurrentView}
           onLogout={handleLogout}
           user={currentUser}
+          organisation={organisation}
+          mobileOpen={dashboardNavOpen}
+          onMobileClose={() => setDashboardNavOpen(false)}
         />
 
         {/* Action center workspace viewport */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Action Bar / Status Topbar */}
-          <header className="bg-white border-b border-brand-border/60 h-16 flex items-center justify-between px-6 shrink-0">
-            <div className="flex items-center gap-3">
+          <header className="dashboard-topbar bg-white border-b border-brand-border/60 min-h-16 flex items-center justify-between px-4 sm:px-6 py-2 shrink-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <button type="button" onClick={() => setDashboardNavOpen(true)} aria-label="Open navigation" className="dashboard-menu-button studio-mini"><Menu /></button>
+              <div className="dashboard-workspace-title min-w-0">
+              <p className="text-[10px] text-gray-400 font-mono uppercase truncate">{activeWorkspace.section} / {organisation?.name || "Organisation"}</p>
+              <h1 className="text-sm sm:text-base font-black truncate">{activeWorkspace.title}</h1>
               <span className="text-[11px] font-mono uppercase bg-brand-sage text-brand-forest px-2.5 py-1 rounded-lg font-bold tracking-wider">
                 Industrial Active Context
               </span>
               <span className="text-xs text-gray-400 font-mono hidden sm:inline">
                 User Scope: ESG Director • Server Ping Active (0.0.0.0:3000)
               </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -1143,13 +1179,13 @@ export default function App() {
                 onClick={() => setCurrentView("dashboard-ai-assistant")}
                 className="bg-brand-forest hover:bg-brand-green-sec text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer animate-pulse"
               >
-                Ask Carbon AI
+                <span className="hidden sm:inline">Ask Carbon AI</span><span className="sm:hidden">AI</span>
               </button>
             </div>
           </header>
 
           {/* Subview Viewport */}
-          <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          <main id="dashboard-content" className="flex-1 overflow-y-auto p-6 space-y-6" tabIndex={-1}>
             {loading ? (
               <div className="h-full flex items-center justify-center font-mono text-xs text-gray-400 flex-col gap-3">
                 <RefreshCw className="w-8 h-8 animate-spin text-brand-forest" />

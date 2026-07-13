@@ -1,6 +1,6 @@
 # Codebase Index
 
-Last reviewed: 2026-07-13 after formal Phase 14 Marketplace and Integrations. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
+Last reviewed: 2026-07-13 after Phase 15 Enterprise UI and UX Overhaul. This index covers tracked application files and intentionally excludes `.env`, `node_modules/`, `dist/`, log files, and Git internals. Update it after every major phase.
 
 ## Folder Tree
 
@@ -371,6 +371,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `docs/PHASE_12_WORKFLOW_COLLABORATION.md` | Formal Phase 12 workflow model, deployment, security, operating flow and email boundary | 028 and collaboration source | Product, engineering, security and operators | Active | Medium | Update when statuses or delivery automation change |
 | `docs/PHASE_13_PUBLIC_ESG_PORTAL.md` | Formal Phase 13 publication boundary, deployment, security, capabilities and verification | 029 and public portal source | Product, communications, sustainability, security and operators | Active | Medium | Review every public snapshot schema change |
 | `docs/PHASE_14_MARKETPLACE_INTEGRATIONS.md` | Formal Phase 14 marketplace, developer API, security boundaries, deployment and production backlog | 030 and marketplace source | Engineering, security, integrations and operators | Active | High | Update with every external adapter or webhook worker release |
+| `docs/PHASE_15_UI_UX_OVERHAUL.md` | Phase 15 design system, responsive shell, accessibility contract and verification record | App shell, sidebar and global CSS | Product, design, frontend engineering and QA | Active | Medium | Keep current when shared UI contracts change |
 | `docs/COMPLETE_COMPANY_USER_GUIDE.md` | End-to-end company journey from public site through onboarding, ingestion, accounting, intelligence, and reporting | Live application workflows | Customers, admins, and support | Active | High | Validate against every major UI release |
 | `docs/PRICING_RESEARCH.md` | Commercial pricing rationale | External sources | Product team | Active | Low | Refresh quarterly |
 | `docs/CODEBASE_INDEX.md` | This inventory | Source tree | Developers | Active | High | Update after major phase |
