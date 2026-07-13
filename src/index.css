@@ -642,8 +642,6 @@ input:focus, select:focus, textarea:focus {
   }
 
   #client-dashboard-app > .dashboard-sidebar.dashboard-sidebar-open { transform: translateX(0); }
-  #client-dashboard-app .dashboard-sidebar > div { display: flex; }
-  #client-dashboard-app .dashboard-sidebar > div:nth-of-type(3) { display: block; }
   #client-dashboard-app .dashboard-sidebar .sidebar-collapse { display: none; }
   #client-dashboard-app .dashboard-nav-close,
   #client-dashboard-app .dashboard-menu-button { display: inline-flex; }
