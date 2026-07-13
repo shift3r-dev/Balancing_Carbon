@@ -54,6 +54,11 @@ const CarbonIntelligenceHub = lazy(() => import("./components/CarbonIntelligence
 const PricingPage = lazy(() => import("./components/PricingPage.tsx"));
 const MetadataStudio = lazy(() => import("./components/MetadataStudio.tsx"));
 const EnterpriseDataHub = lazy(() => import("./components/EnterpriseDataHub.tsx"));
+const AnalyticsStudio = lazy(() => import("./components/AnalyticsStudio.tsx"));
+const SustainabilityIntelligence = lazy(() => import("./components/SustainabilityIntelligence.tsx"));
+const CollaborationCenter = lazy(() => import("./components/CollaborationCenter.tsx"));
+const PublicPortalAdmin = lazy(() => import("./components/PublicPortalAdmin.tsx"));
+const PublicESGPortal = lazy(() => import("./components/PublicESGPortal.tsx"));
 
 // Shared interfaces
 import {
@@ -1084,6 +1089,11 @@ export default function App() {
     );
   };
 
+  const publicPortalMatch = window.location.pathname.match(/^\/portal\/([a-z0-9-]+)\/?$/i);
+  if (publicPortalMatch) {
+    return <Suspense fallback={<DashboardModuleLoader label="Loading public ESG portal..." />}><PublicESGPortal slug={publicPortalMatch[1]} /></Suspense>;
+  }
+
   // Render Client Dashboard Container
   if (authenticated) {
     return (
@@ -1258,7 +1268,27 @@ export default function App() {
                     <EnterpriseDataHub />
                   </Suspense>
                 )}
+                {currentView === "dashboard-collaboration" && (
+                  <EntitlementGate entitlement="collaboration.workflows" title="Workflow and Collaboration">
+                    <Suspense fallback={<DashboardModuleLoader label="Loading Collaboration Center..." />}>
+                      <CollaborationCenter />
+                    </Suspense>
+                  </EntitlementGate>
+                )}
+                {currentView === "dashboard-public-portal" && (
+                  <EntitlementGate entitlement="public.portal" title="Public ESG Portal">
+                    <Suspense fallback={<DashboardModuleLoader label="Loading Public ESG Portal administration..." />}>
+                      <PublicPortalAdmin />
+                    </Suspense>
+                  </EntitlementGate>
+                )}
                 {currentView === "dashboard-help" && <LearningCentre onNavigate={setCurrentView} />}
+                {currentView === "dashboard-analytics" && (
+                  <EntitlementGate entitlement="analytics.trends" title="Analytics Studio">
+                    <Suspense fallback={<DashboardModuleLoader label="Loading Analytics Studio..." />}><AnalyticsStudio /></Suspense>
+                  </EntitlementGate>
+                )}
+                {currentView === "dashboard-sustainability" && <Suspense fallback={<DashboardModuleLoader label="Loading Sustainability Planner..."/>}><SustainabilityIntelligence/></Suspense>}
 
                 {/* Company profile entity updates */}
                 {currentView === "dashboard-company" && renderCompanyProfile()}

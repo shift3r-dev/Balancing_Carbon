@@ -178,4 +178,4 @@ export type ViewState =
   | 'dashboard-energy' | 'dashboard-emissions-scope1' | 'dashboard-emissions-scope2' | 'dashboard-emissions-scope3'
   | 'dashboard-calculator' | 'dashboard-intelligence' | 'dashboard-opportunities' | 'dashboard-scenarios' | 'dashboard-projects'
   | 'dashboard-esg' | 'dashboard-questionnaires' | 'dashboard-documents' | 'dashboard-reports'
-  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform' | 'dashboard-help';
+  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform' | 'dashboard-collaboration' | 'dashboard-public-portal' | 'dashboard-help' | 'dashboard-analytics' | 'dashboard-sustainability';

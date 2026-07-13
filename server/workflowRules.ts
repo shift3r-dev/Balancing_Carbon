@@ -1,0 +1,4 @@
+const transitions:Record<string,string[]>={open:['in-progress','blocked','completed','cancelled'],'in-progress':['blocked','completed','cancelled'],blocked:['in-progress','cancelled'],completed:[],cancelled:[]};
+export function validateTaskTransition(from:string,to:string){if(!(transitions[from]??[]).includes(to))throw new Error(`Task cannot move from ${from} to ${to}.`);return true;}
+export function isOverdue(input:{status:string;dueAt?:string|null},now=new Date()){return !['completed','cancelled'].includes(input.status)&&Boolean(input.dueAt)&&new Date(input.dueAt!).getTime()<now.getTime();}
+export function extractMentionIds(value:unknown,allowed:string[]){return Array.isArray(value)?[...new Set(value.filter((item):item is string=>typeof item==='string'&&allowed.includes(item)))].slice(0,20):[];}

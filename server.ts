@@ -20,6 +20,10 @@ import { createMetadataRouter } from './server/routes/metadataRoutes.js';
 import { createDataPlatformRouter } from './server/routes/dataPlatformRoutes.js';
 import { createAiCopilotRouter } from './server/routes/aiCopilotRoutes.js';
 import { createEnablementRouter } from './server/routes/enablementRoutes.js';
+import { createAnalyticsRouter } from './server/routes/analyticsRoutes.js';
+import { createSustainabilityRouter } from './server/routes/sustainabilityRoutes.js';
+import { createCollaborationRouter } from './server/routes/collaborationRoutes.js';
+import { createPublicPortalRouter } from './server/routes/publicPortalRoutes.js';
 import { runtimeConfig } from './server/config/runtime.js';
 import { errorHandler } from './server/middleware/errorHandler.js';
 import { requestLogger } from './server/middleware/requestLogger.js';
@@ -51,6 +55,10 @@ app.use('/api', createMetadataRouter());
 app.use('/api', createDataPlatformRouter());
 app.use('/api', createAiCopilotRouter());
 app.use('/api', createEnablementRouter());
+app.use('/api', createAnalyticsRouter());
+app.use('/api', createSustainabilityRouter());
+app.use('/api', createCollaborationRouter());
+app.use('/api', createPublicPortalRouter());
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
 

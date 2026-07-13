@@ -21,6 +21,8 @@ import {
   Gauge,
   Target,
   CircleHelp,
+  Users,
+  Globe2,
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
@@ -99,6 +101,8 @@ export default function DashboardSidebar({
       label: "Intelligence",
       items: [
         { id: "dashboard-help", label: "Help & Learning", icon: CircleHelp },
+        { id: "dashboard-analytics", label: "Analytics Studio", icon: BarChart3 },
+        { id: "dashboard-sustainability", label: "Sustainability Planner", icon: Target },
         {
           id: "dashboard-intelligence",
           label: "Diagnostics",
@@ -124,6 +128,8 @@ export default function DashboardSidebar({
     {
       label: "Reporting & Evidence",
       items: [
+        { id: "dashboard-collaboration", label: "Collaboration", icon: Users },
+        { id: "dashboard-public-portal", label: "Public ESG Portal", icon: Globe2 },
         { id: "dashboard-reports", label: "Reports", icon: BarChart3 },
         { id: "dashboard-documents", label: "Documents", icon: FolderClosed },
         {
@@ -147,7 +153,7 @@ export default function DashboardSidebar({
         { id: "dashboard-data-platform", label: "Data Hub", icon: Database },
         { id: "dashboard-settings", label: "System Settings", icon: Settings },
         { id: "dashboard-settings", label: "Audit Logs", icon: ClipboardList, badge: "Soon" },
-        { id: "dashboard-settings", label: "Notifications", icon: Bell, badge: "Soon" },
+        { id: "dashboard-collaboration", label: "Notifications", icon: Bell },
       ],
     },
   ];

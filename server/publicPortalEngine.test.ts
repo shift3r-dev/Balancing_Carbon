@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {aggregateSupplierReadiness,normalizePortalSlug,publicationReadiness,validPortalSections} from './publicPortalEngine.js';
+test('portal slug is deterministic and URL safe',()=>assert.equal(normalizePortalSlug(' Apex Precision & Carbon  '),'apex-precision-carbon'));
+test('portal sections discard unknown and duplicate values',()=>assert.deepEqual(validPortalSections(['carbon','private-ledger','carbon','targets']),['carbon','targets']));
+test('publication readiness blocks incomplete public identity',()=>assert.equal(publicationReadiness({slug:'apex',sections:['carbon'],snapshot:{}}).ready,false));
+test('supplier readiness exposes aggregates without identities',()=>assert.deepEqual(aggregateSupplierReadiness([{supplier_name:'Secret A',engagement_status:'responded',data_quality:'supplier-reported'},{supplier_name:'Secret B',engagement_status:'verified',data_quality:'third-party-verified'}]),{totalSuppliers:2,respondedSuppliers:2,verifiedSuppliers:1,responseRate:100,note:'Aggregate supplier engagement only; supplier identities and commercial data are not published.'}));

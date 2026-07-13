@@ -1,4 +1,6 @@
-# Phase 10 - User Enablement and Product Adoption
+# Adoption Layer - User Enablement and Product Adoption
+
+This adoption layer was delivered between formal roadmap Phases 9 and 10. Formal Phase 10 is the Enterprise Analytics Platform documented in `docs/PHASE_10_ENTERPRISE_ANALYTICS.md`.
 
 ## Purpose
 

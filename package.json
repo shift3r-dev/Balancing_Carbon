@@ -16,7 +16,11 @@
     "test:data": "tsx --test server/dataIngestion.test.ts",
     "test:ai": "tsx --test server/ai/ollamaProvider.test.ts",
     "test:documents": "tsx --test server/documentExtraction.test.ts",
-    "test:studio": "tsx --test server/reportStudioEngine.test.ts"
+    "test:studio": "tsx --test server/reportStudioEngine.test.ts",
+    "test:analytics": "tsx --test server/analyticsFormula.test.ts",
+    "test:sustainability": "tsx --test server/sustainabilityIntelligence.test.ts",
+    "test:workflow": "tsx --test server/workflowRules.test.ts",
+    "test:portal": "tsx --test server/publicPortalEngine.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
