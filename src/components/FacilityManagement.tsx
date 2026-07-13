@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, Edit, Trash2, Building, MapPin, Package, Fuel, Zap, 
   RefreshCw, CheckCircle, Scale, ShieldAlert, X, Shield, Copy, Check, Database
@@ -37,6 +38,15 @@ export default function FacilityManagement({
 
   // Comparing states
   const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!showAddModal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showAddModal]);
 
   const handleToggleCompare = (id: string) => {
     if (compareIds.includes(id)) {
@@ -271,10 +281,10 @@ export default function FacilityManagement({
       )}
 
       {/* Add / Edit Factory Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[1000]">
-          <div className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex justify-between items-center bg-brand-charcoal text-white p-4">
+      {showAddModal ? createPortal(
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-3 sm:p-4 z-[1000]">
+          <div className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-lg w-full max-h-[calc(100svh-1.5rem)] sm:max-h-[calc(100svh-2rem)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+            <div className="shrink-0 flex justify-between items-center bg-brand-charcoal text-white p-4">
               <h3 className="font-bold text-sm font-mono uppercase tracking-wider flex items-center gap-2">
                 <Building className="w-4 h-4 text-brand-forest" /> {editingId ? 'Edit Factory Parameters' : 'Register New Manufacturing Plant'}
               </h3>
@@ -283,9 +293,9 @@ export default function FacilityManagement({
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto p-5 space-y-4 text-xs">
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-mono text-gray-500 mb-1">Facility Name *</label>
                   <input
@@ -310,7 +320,7 @@ export default function FacilityManagement({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-mono text-gray-500 mb-1">Industrial Type / Line *</label>
                   <input
@@ -350,7 +360,7 @@ export default function FacilityManagement({
                   Carbon Base Load Accounting
                 </span>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-mono text-gray-500 mb-1">Electricity Base (kWh / Yr)</label>
                     <input
@@ -373,7 +383,7 @@ export default function FacilityManagement({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                   <div>
                     <label className="block font-mono text-gray-500 mb-1">Fuel Consumption (Qty / Yr)</label>
                     <input
@@ -429,8 +439,9 @@ export default function FacilityManagement({
 
             </form>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body,
+      ) : null}
       {metadataFacility ? <EntityMetadataDialog entityKey="facility" recordId={metadataFacility.id} recordName={metadataFacility.name} onClose={() => setMetadataFacility(null)} /> : null}
 
     </div>
