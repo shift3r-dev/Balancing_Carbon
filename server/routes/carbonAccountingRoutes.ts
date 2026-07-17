@@ -31,8 +31,11 @@ export function createCarbonAccountingRouter() {
   router.patch('/carbon-activities/:id/status', requireAuth, requireOperationalLicense, requirePermission('activity.edit'), async (req: AuthenticatedRequest, res) => {
     const verificationStatus = str(req.body?.verificationStatus, req.body?.verification_status);
     if (!allowedStatuses.has(verificationStatus)) return res.status(400).json({ error: 'Unsupported verification status.' });
+    const { data: existing } = await supabaseAdmin.from('activity_records').select('id, verification_status').eq('id', req.params.id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null).maybeSingle();
+    if (!existing) return res.status(404).json({ error: 'Activity record not found.' });
     const { data, error } = await supabaseAdmin.from('activity_records').update({ verification_status: verificationStatus, updated_by: req.authUser!.id }).eq('id', req.params.id).eq('organisation_id', req.authorization!.organisationId).is('deleted_at', null).select('*').single();
     if (error || !data) return res.status(404).json({ error: error?.message ?? 'Activity record not found.' });
+    await supabaseAdmin.from('carbon_approval_events').insert({ id: `carbon-approval-${randomUUID()}`, organisation_id: req.authorization!.organisationId, activity_record_id: data.id, from_status: existing.verification_status, to_status: verificationStatus, comment: str(req.body?.comment), acted_by: req.authUser!.id });
     res.json({ success: true, activity: data });
   });
 

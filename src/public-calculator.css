@@ -1,0 +1,95 @@
+.public-scope-calculator {
+  min-height: 100vh;
+  padding: 88px 0 96px;
+  color: #17231d;
+  background:
+    linear-gradient(180deg, #edf5ec 0, #f8faf6 430px),
+    #f8faf6;
+}
+
+.public-scope-calculator-intro,
+.public-scope-calculator-shell,
+.public-scope-calculator-note {
+  width: min(1380px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.public-scope-calculator-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, .65fr);
+  align-items: end;
+  gap: 8vw;
+  margin-bottom: 46px;
+}
+
+.public-scope-calculator-intro span {
+  color: #1f5a3d;
+  font-size: .72rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.public-scope-calculator-intro h1 {
+  max-width: 850px;
+  margin: 14px 0 0;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: clamp(3.25rem, 5.3vw, 6rem);
+  line-height: .96;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.public-scope-calculator-intro > p {
+  margin: 0;
+  color: #637168;
+  font-size: .94rem;
+  line-height: 1.75;
+}
+
+.public-scope-calculator-shell {
+  padding: 20px;
+  border: 1px solid rgba(31, 90, 61, .15);
+  background: rgba(255, 255, 255, .74);
+  box-shadow: 0 28px 80px rgba(23, 35, 29, .1);
+  backdrop-filter: blur(18px);
+}
+
+.public-scope-calculator .carbon-engine-workspace > header {
+  background: #fff;
+}
+
+.public-scope-calculator .carbon-engine-workspace > header h1 {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+.public-scope-calculator .engine-field > span {
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+}
+
+.public-scope-calculator-note {
+  margin-top: 18px;
+  color: #7a867f;
+  font-size: .7rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 840px) {
+  .public-scope-calculator { padding-top: 58px; }
+  .public-scope-calculator-intro { grid-template-columns: 1fr; gap: 22px; }
+  .public-scope-calculator-shell { padding: 12px; }
+}
+
+@media (max-width: 560px) {
+  .public-scope-calculator { padding: 42px 0 72px; }
+  .public-scope-calculator-intro,
+  .public-scope-calculator-shell,
+  .public-scope-calculator-note { width: calc(100% - 24px); }
+  .public-scope-calculator-intro h1 { font-size: 3.35rem; }
+  .public-scope-calculator-shell { padding: 7px; }
+  .public-scope-calculator .carbon-engine-workspace > header,
+  .public-scope-calculator .carbon-engine-workspace section,
+  .public-scope-calculator .carbon-engine-workspace aside section { padding-inline: 16px; }
+}

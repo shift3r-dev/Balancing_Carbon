@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import {
   aggregateFacilityActivities,
   calculateActivityEmissions,
+  calculateProfessionalEmissions,
   prototypeEmissionFactors,
   resolveEmissionFactor,
 } from './carbonAccounting.ts';
+import { carbonActivityCatalog } from '../shared/carbonActivityCatalog.ts';
 
 const factor = (sourceType: string) => {
   const resolved = resolveEmissionFactor(sourceType);
@@ -145,4 +147,57 @@ test('incompatible production units do not produce misleading intensity', () => 
 
 test('prototype factors are explicitly labelled as prototype-only', () => {
   assert.ok(prototypeEmissionFactors.every((item) => item.sourceName.toLowerCase().includes('prototype')));
+});
+
+test('professional refrigerant balance records the release formula and inputs', () => {
+  const refrigerantFactor = {
+    ...factor('Diesel'),
+    id: 'test-r410a',
+    sourceType: 'R-410A',
+    activityUnit: 'kg',
+    compatibleUnits: ['kg'],
+    factorUnit: 'kgCO2e/kg',
+    factorValue: 2088,
+    sourceName: 'Test factor fixture',
+    sourceReference: 'Test-only source reference',
+  };
+  const result = calculateProfessionalEmissions({
+    quantity: 0,
+    activityUnit: 'kg',
+    sourceType: 'R-410A',
+    emissionFactor: refrigerantFactor,
+    method: 'refrigerant-balance',
+    beginningInventory: 100,
+    purchases: 20,
+    endingInventory: 110,
+    recoveredOrReturned: 2,
+  });
+  assert.equal(result.normalizedQuantity, 8);
+  assert.equal(result.emissionsTCO2e, 16.704);
+  assert.match(result.formula, /beginning inventory/i);
+  assert.equal(result.inputSnapshot.calculatedRelease, 8);
+});
+
+test('spend calculations are explicitly marked lower confidence', () => {
+  const spendFactor = {
+    ...factor('Diesel'),
+    id: 'test-spend-factor',
+    sourceType: 'Purchased services',
+    activityUnit: 'INR',
+    compatibleUnits: ['INR'],
+    factorUnit: 'kgCO2e/INR',
+    factorValue: 0.02,
+    sourceName: 'Test EEIO fixture',
+    sourceReference: 'Test-only source reference',
+  };
+  const result = calculateProfessionalEmissions({ quantity: 10000, activityUnit: 'INR', sourceType: 'Purchased services', emissionFactor: spendFactor, method: 'spend-factor' });
+  assert.equal(result.emissionsTCO2e, 0.2);
+  assert.equal(result.confidenceScore, 55);
+  assert.ok(result.warnings.some((warning) => /lower data quality/i.test(warning)));
+});
+
+test('catalog includes every GHG Protocol Scope 3 category exactly once', () => {
+  const scope3 = carbonActivityCatalog.filter((source) => source.scope === 'scope-3');
+  assert.equal(scope3.length, 15);
+  assert.deepEqual(new Set(scope3.map((source) => source.category)).size, 15);
 });

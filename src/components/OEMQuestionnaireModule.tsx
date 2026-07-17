@@ -16,6 +16,7 @@ export default function OEMQuestionnaireModule({ surveys, onAddSurvey, onApprove
   const [title, setTitle] = useState('');
   const [oemName, setOemName] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [formError, setFormError] = useState('');
 
   // Selected survey explorer
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>(surveys[0]?.id || '');
@@ -29,7 +30,7 @@ export default function OEMQuestionnaireModule({ surveys, onAddSurvey, onApprove
   const handleCreateSurvey = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !oemName || !dueDate) {
-      alert('Please fill out all survey metrics.');
+      setFormError('Please complete all required survey fields.');
       return;
     }
     onAddSurvey(title, oemName, dueDate);
@@ -37,6 +38,7 @@ export default function OEMQuestionnaireModule({ surveys, onAddSurvey, onApprove
     setTitle('');
     setOemName('');
     setDueDate('');
+    setFormError('');
   };
 
   const handleExpandQuestion = (q: any) => {
@@ -249,44 +251,48 @@ export default function OEMQuestionnaireModule({ surveys, onAddSurvey, onApprove
       {/* Add Survey Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[1000]">
-          <div className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div role="dialog" aria-modal="true" aria-labelledby="oem-survey-dialog-title" className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-md w-full max-h-[calc(100svh-2rem)] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
             <div className="flex justify-between items-center bg-brand-charcoal text-white p-4">
-              <h3 className="font-bold text-sm font-mono uppercase tracking-wider">Ingest New OEM Survey</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
+              <h3 id="oem-survey-dialog-title" className="font-bold text-sm font-mono uppercase tracking-wider">Ingest New OEM Survey</h3>
+              <button type="button" onClick={() => setShowAddModal(false)} aria-label="Close survey form" className="text-gray-400 hover:text-white transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSurvey} className="p-5 space-y-4 text-xs">
+            <form onSubmit={handleCreateSurvey} className="max-h-[calc(100svh-6rem)] overflow-y-auto p-5 space-y-4 text-xs">
+              {formError && <div role="alert" className="border border-amber-200 bg-amber-50 p-3 text-amber-800">{formError}</div>}
               <div>
-                <label className="block font-mono text-gray-500 mb-1">Survey Sheet Title *</label>
+                <label htmlFor="oem-survey-title" className="block font-mono text-gray-500 mb-1">Survey Sheet Title *</label>
                 <input
+                  id="oem-survey-title"
                   type="text"
                   required
                   placeholder="e.g. Mahindra Scope 3 ESG Survey"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); setFormError(''); }}
                   className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite"
                 />
               </div>
               <div>
-                <label className="block font-mono text-gray-500 mb-1">OEM Client Name *</label>
+                <label htmlFor="oem-client-name" className="block font-mono text-gray-500 mb-1">OEM Client Name *</label>
                 <input
+                  id="oem-client-name"
                   type="text"
                   required
                   placeholder="e.g. Mahindra & Mahindra Ltd."
                   value={oemName}
-                  onChange={(e) => setOemName(e.target.value)}
+                  onChange={(e) => { setOemName(e.target.value); setFormError(''); }}
                   className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite"
                 />
               </div>
               <div>
-                <label className="block font-mono text-gray-500 mb-1">Filing Due Date *</label>
+                <label htmlFor="oem-due-date" className="block font-mono text-gray-500 mb-1">Filing Due Date *</label>
                 <input
+                  id="oem-due-date"
                   type="date"
                   required
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  onChange={(e) => { setDueDate(e.target.value); setFormError(''); }}
                   className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono"
                 />
               </div>

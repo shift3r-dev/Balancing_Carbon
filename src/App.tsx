@@ -18,8 +18,6 @@ import {
   BookOpen,
   AlertTriangle,
   RefreshCw,
-  Printer,
-  Download,
   Save,
   Calculator,
   FileCheck,
@@ -33,23 +31,39 @@ import {
 import AsymmetricInfinityLogo from "./components/AsymmetricInfinityLogo.tsx";
 import AssessmentForm from "./components/AssessmentForm.tsx";
 import DashboardSidebar from "./components/DashboardSidebar.tsx";
-import DashboardOverview from "./components/DashboardOverview.tsx";
-import FacilityManagement from "./components/FacilityManagement.tsx";
-import EnergyTracking from "./components/EnergyTracking.tsx";
-import CarbonEngineUI from "./components/CarbonEngineUI.tsx";
-import ESGAssessmentModule from "./components/ESGAssessmentModule.tsx";
-import OEMQuestionnaireModule from "./components/OEMQuestionnaireModule.tsx";
-import DocumentCentre from "./components/DocumentCentre.tsx";
-import AIAssistantModule from "./components/AIAssistantModule.tsx";
-import SubscriptionSettings from "./components/SubscriptionSettings.tsx";
-import ReportingWorkspace from "./components/ReportingWorkspace.tsx";
+import MarketingHome from "./components/MarketingHome.tsx";
+import PublicAuthPortal from "./components/PublicAuthPortal.tsx";
+import PublicSeo from "./components/PublicSeo.tsx";
+import {
+  CompanyInfoPage,
+  ContentHubPage,
+  FrameworksPage,
+  LegalPage,
+  PublicDetailPage,
+  ResourcesHubPage,
+  StrategicInfoPage,
+  TrustPage,
+} from "./components/EnterprisePublicPages.tsx";
+import {
+  AboutPublicPage,
+  ContactPublicPage,
+  FaqPublicPage,
+} from "./components/PublicMarketingPages.tsx";
 import EntitlementGate from "./components/EntitlementGate.tsx";
 import LearningCentre, { ContextHelpDrawer, FirstRunWelcome, OnboardingWidget } from "./components/UserEnablement.tsx";
 import { getAuthenticatedHeaders, parseJsonResponse, safeFetchJson } from "./services/apiClient.ts";
 
 const PublicCarbonCalculator = lazy(() => import("./components/PublicCarbonCalculator.tsx"));
-const ServiceFirstFlow = lazy(() => import("./components/ServiceFirstFlow.tsx"));
-const SectorServicesFlow = lazy(() => import("./components/SectorServicesFlow.tsx"));
+const DashboardOverview = lazy(() => import("./components/DashboardOverview.tsx"));
+const FacilityManagement = lazy(() => import("./components/FacilityManagement.tsx"));
+const EnergyTracking = lazy(() => import("./components/EnergyTracking.tsx"));
+const CarbonEngineUI = lazy(() => import("./components/CarbonEngineUI.tsx"));
+const ESGAssessmentModule = lazy(() => import("./components/ESGAssessmentModule.tsx"));
+const OEMQuestionnaireModule = lazy(() => import("./components/OEMQuestionnaireModule.tsx"));
+const DocumentCentre = lazy(() => import("./components/DocumentCentre.tsx"));
+const AIAssistantModule = lazy(() => import("./components/AIAssistantModule.tsx"));
+const SubscriptionSettings = lazy(() => import("./components/SubscriptionSettings.tsx"));
+const ReportingWorkspace = lazy(() => import("./components/ReportingWorkspace.tsx"));
 const CarbonIntelligenceHub = lazy(() => import("./components/CarbonIntelligenceHub.tsx"));
 const PricingPage = lazy(() => import("./components/PricingPage.tsx"));
 const MetadataStudio = lazy(() => import("./components/MetadataStudio.tsx"));
@@ -60,6 +74,8 @@ const CollaborationCenter = lazy(() => import("./components/CollaborationCenter.
 const PublicPortalAdmin = lazy(() => import("./components/PublicPortalAdmin.tsx"));
 const PublicESGPortal = lazy(() => import("./components/PublicESGPortal.tsx"));
 const MarketplaceHub = lazy(() => import("./components/MarketplaceHub.tsx"));
+const AdminDashboard = lazy(() => import("./components/AdminDashboard.tsx"));
+const PlatformAdminConsole = lazy(() => import("./components/PlatformAdminConsole.tsx"));
 
 // Shared interfaces
 import {
@@ -89,17 +105,77 @@ function DashboardModuleLoader({ label }: { label: string }) {
   );
 }
 
+const publicBaseRoutes: Partial<Record<ViewState, string>> = {
+  home: "/",
+  services: "/services",
+  industries: "/industries",
+  ai: "/ai",
+  tools: "/tools",
+  resources: "/resources",
+  insights: "/insights",
+  "case-studies": "/case-studies",
+  trust: "/trust",
+  frameworks: "/frameworks",
+  about: "/about",
+  contact: "/contact",
+  faq: "/faq",
+  pricing: "/pricing",
+  careers: "/careers",
+  partners: "/partners",
+  press: "/press",
+  "media-kit": "/media-kit",
+  mission: "/mission",
+  vision: "/vision",
+  methodology: "/methodology",
+  certifications: "/certifications",
+  research: "/research",
+  whitepapers: "/whitepapers",
+  blog: "/blog",
+  privacy: "/privacy",
+  terms: "/terms",
+  cookies: "/cookies",
+  login: "/login",
+  assessment: "/assessment",
+  "public-calculator": "/calculator",
+};
+
+const detailRouteMap: Record<string, { view: ViewState; prefix: string }> = {
+  services: { view: "service-detail", prefix: "/services" },
+  industries: { view: "industry-detail", prefix: "/industries" },
+  ai: { view: "ai-detail", prefix: "/ai" },
+  tools: { view: "tool-detail", prefix: "/tools" },
+  insights: { view: "insight-detail", prefix: "/insights" },
+  "case-studies": { view: "case-study-detail", prefix: "/case-studies" },
+};
+
+function publicLocationState() {
+  const cleanPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  const detailMatch = cleanPath.match(/^\/(services|industries|ai|tools|insights|case-studies)\/([^/]+)$/);
+  if (detailMatch) return { view: detailRouteMap[detailMatch[1]].view, slug: decodeURIComponent(detailMatch[2]) };
+  const entry = Object.entries(publicBaseRoutes).find(([, path]) => path === cleanPath);
+  return { view: (entry?.[0] as ViewState | undefined) ?? "home", slug: "" };
+}
+
+function publicPathFor(view: ViewState, slug = "") {
+  const detail = Object.values(detailRouteMap).find((entry) => entry.view === view);
+  if (detail && slug) return `${detail.prefix}/${encodeURIComponent(slug)}`;
+  return publicBaseRoutes[view] ?? "/";
+}
+
 export default function App() {
   // Navigation & User session states
+  const initialPublicLocation = publicLocationState();
   const [currentView, setCurrentView] = useState<ViewState>(() =>
-    localStorage.getItem("balancing_carbon_session") ? "dashboard-overview" : "home",
+    localStorage.getItem("balancing_carbon_session") ? "dashboard-overview" : initialPublicLocation.view,
   );
+  const [publicContentSlug, setPublicContentSlug] = useState(initialPublicLocation.slug);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dashboardNavOpen, setDashboardNavOpen] = useState(false);
   const [contextHelpOpen, setContextHelpOpen] = useState(false);
   const [authenticated, setAuthenticated] = useState(() => {
     return localStorage.getItem("balancing_carbon_session") !== null;
   });
+
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem("balancing_carbon_session");
     if (!saved) return null;
@@ -119,6 +195,27 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [passwordResetMessage, setPasswordResetMessage] = useState("");
 
+  const navigatePublic = (view: ViewState, slug = "") => {
+    setCurrentView(view);
+    setPublicContentSlug(slug);
+    setMobileMenuOpen(false);
+    const nextPath = publicPathFor(view, slug);
+    if (window.location.pathname !== nextPath) window.history.pushState({ view, slug }, "", nextPath);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (authenticated) return;
+      const locationState = publicLocationState();
+      setCurrentView(locationState.view);
+      setPublicContentSlug(locationState.slug);
+      setMobileMenuOpen(false);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [authenticated]);
+
   const [signupName, setSignupName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -129,6 +226,8 @@ export default function App() {
 
   // Core business models synced from backend
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
+  const [organisationDraft, setOrganisationDraft] = useState<Organisation | null>(null);
+  const [organisationSaveState, setOrganisationSaveState] = useState<"" | "saving" | "saved" | "error">("");
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [records, setRecords] = useState<EnergyRecord[]>([]);
   const [productionRecords, setProductionRecords] = useState<ProductionRecord[]>([]);
@@ -148,6 +247,10 @@ export default function App() {
   const [reportType, setReportType] = useState("BRSR Core Audit Report");
   const [reportPeriod, setReportPeriod] = useState("FY 2025-26");
   const [reportSummary, setReportSummary] = useState("");
+
+  useEffect(() => {
+    setOrganisationDraft(organisation);
+  }, [organisation]);
 
   // Sync state on mount or user changes
   useEffect(() => {
@@ -620,10 +723,12 @@ export default function App() {
       });
       if (updated) {
         setOrganisation(updated);
+        return true;
       }
     } catch (err) {
       console.error(err);
     }
+    return false;
   };
 
   const handleAddReport = async (
@@ -695,6 +800,10 @@ export default function App() {
     setSignupError("");
     if (!signupName || !signupEmail || !signupPassword || !signupOrgName) {
       setSignupError("All fields are required.");
+      return;
+    }
+    if (signupPassword.length < 10 || !/[A-Za-z]/.test(signupPassword) || !/\d/.test(signupPassword)) {
+      setSignupError("Use at least 10 characters with a letter and number.");
       return;
     }
 
@@ -776,6 +885,7 @@ export default function App() {
         </div>
       );
     }
+    const profile = organisationDraft ?? organisation;
     return (
       <div className="space-y-6">
         <div className="bg-white p-5 rounded-xl border border-brand-border">
@@ -794,130 +904,115 @@ export default function App() {
               Entity Metadata
             </h3>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-name" className="block text-gray-400 font-mono mb-1">
                   Company Registered Name
                 </label>
                 <input
+                  id="organisation-name"
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-medium text-brand-charcoal"
-                  value={organisation.name}
-                  onChange={(e) =>
-                    handleUpdateOrg({ ...organisation, name: e.target.value })
-                  }
+                  value={profile.name}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, name: e.target.value }); setOrganisationSaveState(""); }}
                 />
               </div>
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-employees" className="block text-gray-400 font-mono mb-1">
                   Employee Count
                 </label>
                 <input
+                  id="organisation-employees"
                   type="number"
+                  min="0"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.employeeCount}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      employeeCount: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
+                  value={profile.employeeCount}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, employeeCount: Math.max(0, parseInt(e.target.value, 10) || 0) }); setOrganisationSaveState(""); }}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-location" className="block text-gray-400 font-mono mb-1">
                   HQ Corporate Office Address
                 </label>
                 <input
+                  id="organisation-location"
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite text-brand-charcoal"
-                  value={organisation.location}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      location: e.target.value,
-                    })
-                  }
+                  value={profile.location}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, location: e.target.value }); setOrganisationSaveState(""); }}
                 />
               </div>
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-industry" className="block text-gray-400 font-mono mb-1">
                   Primary Industrial Classification
                 </label>
                 <input
+                  id="organisation-industry"
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite text-brand-charcoal"
-                  value={organisation.industry}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      industry: e.target.value,
-                    })
-                  }
+                  value={profile.industry}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, industry: e.target.value }); setOrganisationSaveState(""); }}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 border-t border-brand-border/50 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 border-t border-brand-border/50 pt-4">
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-target" className="block text-gray-400 font-mono mb-1">
                   Net Carbon Target reduction
                 </label>
                 <input
+                  id="organisation-target"
                   type="number"
+                  min="0"
+                  max="100"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.targetReductionPercent}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      targetReductionPercent: parseInt(e.target.value, 10) || 0,
-                    })
-                  }
+                  value={profile.targetReductionPercent}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, targetReductionPercent: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0)) }); setOrganisationSaveState(""); }}
                 />
               </div>
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-reporting-year" className="block text-gray-400 font-mono mb-1">
                   Active Reporting Cycle
                 </label>
                 <input
+                  id="organisation-reporting-year"
                   type="text"
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.reportingYear}
-                  onChange={(e) =>
-                    handleUpdateOrg({
-                      ...organisation,
-                      reportingYear: e.target.value,
-                    })
-                  }
+                  value={profile.reportingYear}
+                  onChange={(e) => { setOrganisationDraft({ ...profile, reportingYear: e.target.value }); setOrganisationSaveState(""); }}
                 />
               </div>
               <div>
-                <label className="block text-gray-400 font-mono mb-1">
+                <label htmlFor="organisation-id" className="block text-gray-400 font-mono mb-1">
                   Organisation ID
                 </label>
                 <input
+                  id="organisation-id"
                   type="text"
                   readOnly
                   className="w-full border border-brand-border p-2.5 rounded bg-brand-offwhite font-mono text-brand-charcoal"
-                  value={organisation.id}
+                  value={profile.id}
                 />
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex flex-col items-stretch gap-2 pt-2 sm:flex-row sm:items-center sm:justify-end">
+              {organisationSaveState === "saved" && <span role="status" className="text-xs text-brand-forest">Organisation profile saved.</span>}
+              {organisationSaveState === "error" && <span role="alert" className="text-xs text-brand-red">Unable to save the profile. Please try again.</span>}
               <button
                 type="button"
-                onClick={() =>
-                  alert(
-                    "Corporate Profile configurations committed inside secure tenant folder.",
-                  )
-                }
+                disabled={organisationSaveState === "saving"}
+                onClick={async () => {
+                  setOrganisationSaveState("saving");
+                  setOrganisationSaveState(await handleUpdateOrg(profile) ? "saved" : "error");
+                }}
                 className="bg-brand-forest hover:bg-brand-green-sec text-white px-5 py-2 rounded font-mono font-bold flex items-center gap-1.5 cursor-pointer"
               >
-                <Save className="w-4 h-4" /> Commit Entity Metadata
+                <Save className="w-4 h-4" /> {organisationSaveState === "saving" ? "Saving..." : "Save Profile"}
               </button>
             </div>
           </div>
@@ -1070,24 +1165,14 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex gap-1 shrink-0">
+                  <div className="flex shrink-0">
                     <button
-                      onClick={() => window.print()}
-                      className="p-2 bg-white hover:bg-gray-50 text-gray-600 rounded border border-brand-border"
-                      title="Print hardcopy sheet"
+                      type="button"
+                      onClick={() => setCurrentView("dashboard-reports")}
+                      className="flex items-center gap-1.5 p-2 bg-white hover:bg-gray-50 text-brand-forest rounded border border-brand-border"
+                      title="Open this report in Reporting Studio"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() =>
-                        alert(
-                          `Downloading audit sheet package for: ${rep.title}`,
-                        )
-                      }
-                      className="p-2 bg-white hover:bg-gray-50 text-brand-forest rounded border border-brand-border"
-                      title="Download PDF package"
-                    >
-                      <Download className="w-3.5 h-3.5" />
+                      <FileText className="w-3.5 h-3.5" /><span className="hidden sm:inline">Open studio</span>
                     </button>
                   </div>
                 </div>
@@ -1104,7 +1189,7 @@ export default function App() {
     "dashboard-company": { title: "Organisation Profile", section: "Command Center" },
     "dashboard-facilities": { title: "Facilities", section: "Command Center" },
     "dashboard-calculator": { title: "Carbon Calculator", section: "Carbon Inventory" },
-    "dashboard-energy": { title: "Activity Ledgers", section: "Carbon Inventory" },
+    "dashboard-energy": { title: "Activity & Production Ledgers", section: "Carbon Inventory" },
     "dashboard-emissions-scope1": { title: "Scope 1 Inventory", section: "Carbon Inventory" },
     "dashboard-emissions-scope2": { title: "Scope 2 Inventory", section: "Carbon Inventory" },
     "dashboard-emissions-scope3": { title: "Scope 3 Inventory", section: "Carbon Inventory" },
@@ -1117,12 +1202,14 @@ export default function App() {
     "dashboard-documents": { title: "Document Vault", section: "Reporting & Evidence" },
     "dashboard-questionnaires": { title: "OEM Questionnaires", section: "Reporting & Evidence" },
     "dashboard-esg": { title: "ESG Readiness", section: "Reporting & Evidence" },
-    "dashboard-ai-assistant": { title: "Carbon Copilot", section: "System" },
+    "dashboard-ai-assistant": { title: "Carbon Copilot", section: "Intelligence" },
     "dashboard-metadata": { title: "Metadata Studio", section: "System" },
     "dashboard-data-platform": { title: "Enterprise Data Hub", section: "System" },
     "dashboard-marketplace": { title: "Marketplace", section: "System" },
-    "dashboard-settings": { title: "Subscription & Settings", section: "System" },
-    "dashboard-help": { title: "Help & Learning", section: "Support" },
+    "dashboard-admin": { title: "Admin Console", section: "Administration" },
+    "dashboard-platform-admin": { title: "Platform Admin Console", section: "Balancing Carbon Operations" },
+    "dashboard-settings": { title: "System Settings", section: "System" },
+    "dashboard-help": { title: "Help & Learning", section: "System" },
   };
   const activeWorkspace = workspaceMeta[currentView] ?? { title: "Balancing Carbon", section: "Workspace" };
 
@@ -1152,7 +1239,7 @@ export default function App() {
         />
 
         {/* Action center workspace viewport */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
           {/* Action Bar / Status Topbar */}
           <header className="dashboard-topbar bg-white border-b border-brand-border/60 min-h-16 flex items-center justify-between px-4 sm:px-6 py-2 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
@@ -1161,10 +1248,10 @@ export default function App() {
               <p className="text-[10px] text-gray-400 font-mono uppercase truncate">{activeWorkspace.section} / {organisation?.name || "Organisation"}</p>
               <h1 className="text-sm sm:text-base font-black truncate">{activeWorkspace.title}</h1>
               <span className="text-[11px] font-mono uppercase bg-brand-sage text-brand-forest px-2.5 py-1 rounded-lg font-bold tracking-wider">
-                Industrial Active Context
+                Enterprise Workspace
               </span>
               <span className="text-xs text-gray-400 font-mono hidden sm:inline">
-                User Scope: ESG Director • Server Ping Active (0.0.0.0:3000)
+                All platform modules available
               </span>
               </div>
             </div>
@@ -1172,6 +1259,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setContextHelpOpen(true)}
+                aria-label="Open contextual help"
                 className="border border-brand-border hover:bg-brand-offwhite text-brand-charcoal px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5"
                 data-help-id="context-help"
               >
@@ -1179,7 +1267,7 @@ export default function App() {
               </button>
               <button
                 onClick={() => setCurrentView("dashboard-ai-assistant")}
-                className="bg-brand-forest hover:bg-brand-green-sec text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer animate-pulse"
+                className="bg-brand-forest hover:bg-brand-green-sec text-white px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
               >
                 <span className="hidden sm:inline">Ask Carbon AI</span><span className="sm:hidden">AI</span>
               </button>
@@ -1187,14 +1275,14 @@ export default function App() {
           </header>
 
           {/* Subview Viewport */}
-          <main id="dashboard-content" className="flex-1 overflow-y-auto p-6 space-y-6" tabIndex={-1}>
+          <main id="dashboard-content" className="min-w-0 flex-1 overflow-y-auto p-6 space-y-6" tabIndex={-1}>
             {loading ? (
               <div className="h-full flex items-center justify-center font-mono text-xs text-gray-400 flex-col gap-3">
                 <RefreshCw className="w-8 h-8 animate-spin text-brand-forest" />
                 <span>Loading secure multi-tenant factory logs...</span>
               </div>
             ) : (
-              <>
+              <Suspense fallback={<DashboardModuleLoader label="Loading workspace..." />}>
                 {currentView === "dashboard-overview" && (
                   <>
                   <OnboardingWidget onNavigate={setCurrentView} onOpenHelp={() => setCurrentView("dashboard-help")} />
@@ -1232,14 +1320,7 @@ export default function App() {
                   />
                 )}
                 {currentView === "dashboard-calculator" && (
-                  <Suspense fallback={<DashboardModuleLoader label="Loading calculator..." />}>
-                    <PublicCarbonCalculator
-                      onRegister={() => setCurrentView("dashboard-energy")}
-                      ctaTitle="Move Estimate Into Activity Ledger"
-                      ctaDescription="Use this sandbox for quick modelling, then enter real electricity, fuel, production, evidence, and factor-backed records in the Energy Ledger so dashboard totals remain traceable."
-                      ctaButtonLabel="Open Energy Ledger"
-                    />
-                  </Suspense>
+                  <CarbonEngineUI scopeType="all" facilities={facilities} records={records} onNavigate={setCurrentView} />
                 )}
 
                 {/* Carbon engine explorer views */}
@@ -1248,6 +1329,7 @@ export default function App() {
                     scopeType="scope-1"
                     facilities={facilities}
                     records={records}
+                    onNavigate={setCurrentView}
                   />
                 )}
                 {currentView === "dashboard-emissions-scope2" && (
@@ -1255,6 +1337,7 @@ export default function App() {
                     scopeType="scope-2"
                     facilities={facilities}
                     records={records}
+                    onNavigate={setCurrentView}
                   />
                 )}
                 {currentView === "dashboard-emissions-scope3" && (
@@ -1262,6 +1345,7 @@ export default function App() {
                     scopeType="scope-3"
                     facilities={facilities}
                     records={records}
+                    onNavigate={setCurrentView}
                   />
                 )}
                 {currentView === "dashboard-intelligence" && (
@@ -1334,6 +1418,24 @@ export default function App() {
                     </Suspense>
                   </EntitlementGate>
                 )}
+                {currentView === "dashboard-admin" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading Admin Console..." />}>
+                    <AdminDashboard
+                      user={currentUser}
+                      organisation={organisation}
+                      facilities={facilities}
+                      records={records}
+                      documentsCount={documents.length}
+                      reportsCount={reports.length}
+                      onNavigate={setCurrentView}
+                    />
+                  </Suspense>
+                )}
+                {currentView === "dashboard-platform-admin" && (
+                  <Suspense fallback={<DashboardModuleLoader label="Loading Platform Admin Console..." />}>
+                    <PlatformAdminConsole user={currentUser} onNavigate={setCurrentView} />
+                  </Suspense>
+                )}
                 {currentView === "dashboard-help" && <LearningCentre onNavigate={setCurrentView} />}
                 {currentView === "dashboard-analytics" && (
                   <EntitlementGate entitlement="analytics.trends" title="Analytics Studio">
@@ -1350,7 +1452,7 @@ export default function App() {
                 {currentView === "dashboard-ai-assistant" && (
                   <AIAssistantModule onNavigate={setCurrentView} />
                 )}
-              </>
+              </Suspense>
             )}
           </main>
         </div>
@@ -1364,76 +1466,63 @@ export default function App() {
       className="min-h-screen bg-brand-offwhite text-brand-charcoal font-sans flex flex-col justify-between"
       id="public-website"
     >
+      <PublicSeo view={currentView} slug={publicContentSlug} />
+      <a className="bc-skip-link" href="#public-main-content">Skip to content</a>
       {/* Public Header bar with Asymmetric logo */}
-      <header className="bg-white border-b border-brand-border/60 min-h-24 flex items-center sticky top-0 z-[100] px-6 py-3">
+      <header className="bc-site-header bg-white border-b border-brand-border/60 flex items-center sticky top-0 z-[100] px-6">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
           <button
-            onClick={() => setCurrentView("home")}
-            className="cursor-pointer"
+            onClick={() => navigatePublic("home")}
+            className="cursor-pointer v1-public-logo"
+            aria-label="Balancing Carbon home"
           >
-            <AsymmetricInfinityLogo size="lg" />
+            <AsymmetricInfinityLogo size="md" />
           </button>
 
           {/* Desktop Links */}
-          <nav className="hidden lg:flex items-center gap-5 xl:gap-7 text-xs font-bold font-mono tracking-wide text-brand-charcoal">
-            <button
-              onClick={() => setCurrentView("industries")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "industries" ? "text-brand-forest" : "text-gray-500"}`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" /> Services (Sector-First)
-            </button>
-            <button
-              onClick={() => setCurrentView("public-calculator")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "public-calculator" ? "text-brand-forest" : "text-gray-500"}`}
-            >
-              <FileText className="w-3.5 h-3.5" /> Resources
-            </button>
-            <button
-              onClick={() => setCurrentView("services")}
-              className={`px-5 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer ${
-                currentView === "services"
-                  ? "bg-brand-charcoal text-white"
-                  : "bg-brand-charcoal text-white hover:bg-black"
-              }`}
-            >
-              <Database className="w-3.5 h-3.5 text-brand-sage" /> All Services
-              (Service-First)
-            </button>
-            <button
-              onClick={() => setCurrentView("about")}
-              className={`hover:text-brand-forest transition-colors cursor-pointer flex items-center gap-1.5 ${currentView === "about" ? "text-brand-forest" : "text-gray-500"}`}
-            >
-              <Info className="w-3.5 h-3.5" /> About Us
-            </button>
-            <button onClick={() => setCurrentView("pricing")} className={`hover:text-brand-forest transition-colors cursor-pointer ${currentView === "pricing" ? "text-brand-forest" : "text-gray-500"}`}>Pricing</button>
+          <nav className="hidden min-[980px]:flex items-center gap-6 text-sm font-semibold text-brand-charcoal" aria-label="Main navigation">
+            {[
+              ["Services", "services"],
+              ["Industries", "industries"],
+              ["AI", "ai"],
+              ["Resources", "resources"],
+              ["Pricing", "pricing"],
+              ["About", "about"],
+            ].map(([label, view]) => (
+              <button
+                key={view}
+                onClick={() => navigatePublic(view as ViewState)}
+                aria-current={currentView === view ? "page" : undefined}
+                className={`bc-public-nav-link ${currentView === view ? "is-active" : ""}`}
+              >
+                {label}
+              </button>
+            ))}
           </nav>
 
           {/* Action Login triggers */}
-          <div className="hidden lg:flex items-center gap-2 xl:gap-3">
+          <div className="hidden min-[980px]:flex items-center gap-2">
+            <button className="bc-consult-button" onClick={() => navigatePublic("contact")}>Book consultation</button>
             <button
               onClick={() => {
                 setIsSignUpMode(false);
-                setCurrentView("login");
+                navigatePublic("login");
               }}
-              className="text-xs font-mono font-bold text-gray-500 hover:text-brand-forest px-3 py-2 rounded-lg border border-transparent hover:border-brand-border transition-all flex items-center gap-1.5"
+              className="v1-portal-button"
+              aria-label="Open Client Portal"
+              title="Client Portal"
             >
-              <Lock className="w-3.5 h-3.5" /> Sign In
-            </button>
-            <button
-              onClick={() => {
-                setIsSignUpMode(true);
-                setCurrentView("login");
-              }}
-              className="text-xs font-mono font-bold text-brand-forest hover:text-white px-3 py-2 rounded-lg border border-brand-forest/30 hover:bg-brand-forest transition-all flex items-center gap-1.5"
-            >
-              <Building className="w-3.5 h-3.5" /> Register
+              <Lock className="w-5 h-5" />
             </button>
           </div>
 
           {/* Mobile menu hamburger toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden text-brand-charcoal hover:text-brand-forest"
+            className="min-[980px]:hidden text-brand-charcoal hover:text-brand-forest"
+            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="public-mobile-navigation"
           >
             {mobileMenuOpen ? (
               <X className="w-6 h-6" />
@@ -1446,49 +1535,26 @@ export default function App() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-white border-b border-brand-border/60 py-4 px-6 space-y-3 font-mono font-bold text-xs">
-          <button
-            onClick={() => {
-              setCurrentView("industries");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
-          >
-            Services (Sector-First)
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("public-calculator");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
-          >
-            Resources & Calculator
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("services");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-brand-forest hover:text-brand-green-sec flex items-center gap-1.5 font-extrabold"
-          >
-            <Database className="w-4 h-4" /> All Services (Service-First)
-          </button>
-          <button
-            onClick={() => {
-              setCurrentView("about");
-              setMobileMenuOpen(false);
-            }}
-            className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest"
-          >
-            About Us
-          </button>
+        <div id="public-mobile-navigation" className="bc-mobile-menu min-[980px]:hidden bg-white border-b border-brand-border/60 py-4 px-6 space-y-3 font-semibold text-sm">
+          {[
+            ["Home", "home"],
+            ["Services", "services"],
+            ["Industries", "industries"],
+            ["Governed AI", "ai"],
+            ["Tools", "tools"],
+            ["Resources", "resources"],
+            ["Pricing", "pricing"],
+            ["About", "about"],
+            ["Contact", "contact"],
+          ].map(([label, view]) => (
+            <button key={view} onClick={() => navigatePublic(view as ViewState)} className="block w-full text-left py-2 text-gray-600 hover:text-brand-forest">{label}</button>
+          ))}
           <div className="border-t border-brand-border/40 pt-3 flex flex-col gap-2">
+            <button onClick={() => navigatePublic("contact")} className="w-full text-center py-2 text-brand-forest border border-brand-border rounded">Book consultation</button>
             <button
               onClick={() => {
                 setIsSignUpMode(false);
-                setCurrentView("login");
-                setMobileMenuOpen(false);
+                navigatePublic("login");
               }}
               className="w-full text-center py-2 text-brand-charcoal border border-brand-border rounded"
             >
@@ -1497,8 +1563,7 @@ export default function App() {
             <button
               onClick={() => {
                 setIsSignUpMode(true);
-                setCurrentView("login");
-                setMobileMenuOpen(false);
+                navigatePublic("login");
               }}
               className="w-full text-center py-2 bg-brand-forest text-white rounded font-bold"
             >
@@ -1509,9 +1574,22 @@ export default function App() {
       )}
 
       {/* Main Content Areas */}
-      <main className="flex-grow">
+      <main className="flex-grow" id="public-main-content">
         {/* View: Public Homepage */}
         {currentView === "home" && (
+          <MarketingHome
+            onNavigate={navigatePublic}
+            onLogin={() => {
+              setIsSignUpMode(false);
+              navigatePublic("login");
+            }}
+            onRegister={() => {
+              setIsSignUpMode(true);
+              navigatePublic("login");
+            }}
+          />
+        )}
+        {false && (
           <div className="space-y-24 pb-24">
             {/* HERO SECTION */}
             <section className="bg-white border-b border-brand-border/40 py-20 px-6">
@@ -1890,7 +1968,7 @@ export default function App() {
             <PublicCarbonCalculator
               onRegister={() => {
                 setIsSignUpMode(true);
-                setCurrentView("login");
+                navigatePublic("login");
               }}
             />
           </Suspense>
@@ -1898,37 +1976,60 @@ export default function App() {
 
         {currentView === "pricing" && (
           <Suspense fallback={<DashboardModuleLoader label="Loading pricing..." />}>
-            <PricingPage onStart={(planId, billingInterval) => { setSignupPlanId(planId); setSignupBillingInterval(billingInterval); setIsSignUpMode(true); setCurrentView("login"); }} />
+            <PricingPage onStart={(planId, billingInterval) => { setSignupPlanId(planId); setSignupBillingInterval(billingInterval); setIsSignUpMode(true); navigatePublic("login"); }} />
           </Suspense>
         )}
 
         {/* View: Services Portfolio */}
         {currentView === "services" && (
-          <Suspense fallback={<DashboardModuleLoader label="Loading services..." />}>
-            <ServiceFirstFlow />
-          </Suspense>
+          <ContentHubPage kind="service" onNavigate={navigatePublic} />
         )}
 
-        {/* View: Sector-First Services */}
-        {currentView === "industries" && (
-          <Suspense fallback={<DashboardModuleLoader label="Loading sector services..." />}>
-            <SectorServicesFlow />
-          </Suspense>
-        )}
+        {currentView === "industries" && <ContentHubPage kind="industry" onNavigate={navigatePublic} />}
+        {currentView === "ai" && <ContentHubPage kind="ai" onNavigate={navigatePublic} />}
+        {currentView === "tools" && <ContentHubPage kind="tool" onNavigate={navigatePublic} />}
+        {currentView === "insights" && <ContentHubPage kind="insight" onNavigate={navigatePublic} />}
+        {currentView === "case-studies" && <ContentHubPage kind="case-study" onNavigate={navigatePublic} />}
+        {currentView === "resources" && <ResourcesHubPage onNavigate={navigatePublic} />}
+        {currentView === "frameworks" && <FrameworksPage onNavigate={navigatePublic} />}
+        {currentView === "trust" && <TrustPage onNavigate={navigatePublic} />}
+        {currentView === "careers" && <CompanyInfoPage page="careers" onNavigate={navigatePublic} />}
+        {currentView === "partners" && <CompanyInfoPage page="partners" onNavigate={navigatePublic} />}
+        {currentView === "press" && <CompanyInfoPage page="press" onNavigate={navigatePublic} />}
+        {currentView === "media-kit" && <CompanyInfoPage page="media-kit" onNavigate={navigatePublic} />}
+        {currentView === "mission" && <StrategicInfoPage page="mission" onNavigate={navigatePublic} />}
+        {currentView === "vision" && <StrategicInfoPage page="vision" onNavigate={navigatePublic} />}
+        {currentView === "methodology" && <StrategicInfoPage page="methodology" onNavigate={navigatePublic} />}
+        {currentView === "certifications" && <StrategicInfoPage page="certifications" onNavigate={navigatePublic} />}
+        {currentView === "research" && <StrategicInfoPage page="research" onNavigate={navigatePublic} />}
+        {currentView === "whitepapers" && <StrategicInfoPage page="whitepapers" onNavigate={navigatePublic} />}
+        {currentView === "blog" && <StrategicInfoPage page="blog" onNavigate={navigatePublic} />}
+        {currentView === "privacy" && <LegalPage page="privacy" />}
+        {currentView === "terms" && <LegalPage page="terms" />}
+        {currentView === "cookies" && <LegalPage page="cookies" />}
+        {currentView === "service-detail" && <PublicDetailPage kind="service" slug={publicContentSlug} onNavigate={navigatePublic} />}
+        {currentView === "industry-detail" && <PublicDetailPage kind="industry" slug={publicContentSlug} onNavigate={navigatePublic} />}
+        {currentView === "ai-detail" && <PublicDetailPage kind="ai" slug={publicContentSlug} onNavigate={navigatePublic} />}
+        {currentView === "tool-detail" && <PublicDetailPage kind="tool" slug={publicContentSlug} onNavigate={navigatePublic} />}
+        {currentView === "insight-detail" && <PublicDetailPage kind="insight" slug={publicContentSlug} onNavigate={navigatePublic} />}
+        {currentView === "case-study-detail" && <PublicDetailPage kind="case-study" slug={publicContentSlug} onNavigate={navigatePublic} />}
         {/* View: Free Interactive ESG Assessment form */}
         {currentView === "assessment" && (
           <div className="max-w-5xl mx-auto px-6 py-16">
             <AssessmentForm
               onLoginRequest={() => {
                 setIsSignUpMode(false);
-                setCurrentView("login");
+                navigatePublic("login");
               }}
             />
           </div>
         )}
 
         {/* View: Founding Vision / Our Vision */}
-        {currentView === "about" && (
+        {currentView === "about" && <AboutPublicPage onNavigate={navigatePublic} />}
+        {currentView === "faq" && <FaqPublicPage onNavigate={navigatePublic} />}
+        {currentView === "contact" && <ContactPublicPage onNavigate={navigatePublic} />}
+        {false && (
           <div className="max-w-3xl mx-auto px-6 py-16 space-y-8 text-xs text-gray-500 leading-relaxed">
             <h1 className="text-3xl font-black text-brand-charcoal tracking-tight text-center">
               The Balancing Carbon Vision
@@ -1986,6 +2087,40 @@ export default function App() {
 
         {/* View: Secure Log In & Sign Up Portal */}
         {currentView === "login" && (
+          <PublicAuthPortal
+            isSignUpMode={isSignUpMode}
+            isForgotPasswordMode={isForgotPasswordMode}
+            loginError={loginError}
+            signupError={signupError}
+            passwordResetMessage={passwordResetMessage}
+            loginEmail={loginEmail}
+            loginPassword={loginPassword}
+            signupName={signupName}
+            signupEmail={signupEmail}
+            signupOrgName={signupOrgName}
+            signupPassword={signupPassword}
+            setLoginEmail={setLoginEmail}
+            setLoginPassword={setLoginPassword}
+            setSignupName={setSignupName}
+            setSignupEmail={setSignupEmail}
+            setSignupOrgName={setSignupOrgName}
+            setSignupPassword={setSignupPassword}
+            onLogin={handleFormLogin}
+            onSignup={handleFormSignup}
+            onPasswordReset={handlePasswordReset}
+            onShowReset={() => { setIsForgotPasswordMode(true); setLoginError(""); }}
+            onShowSignup={() => { setIsSignUpMode(true); setIsForgotPasswordMode(false); setLoginError(""); }}
+            onReturnToLogin={() => {
+              setIsSignUpMode(false);
+              setIsForgotPasswordMode(false);
+              setPasswordResetMessage("");
+              setLoginError("");
+              setSignupError("");
+            }}
+            onHome={() => navigatePublic("home")}
+          />
+        )}
+        {false && currentView === "login" && (
           <div className="max-w-md mx-auto px-6 py-16">
             <div className="bg-white border border-brand-border rounded-xl shadow-lg p-6 space-y-6">
               <div className="text-center space-y-1">
@@ -2169,7 +2304,48 @@ export default function App() {
       </main>
 
       {/* Public Footer */}
-      <footer className="bg-brand-charcoal text-white border-t border-white/5 py-10 px-6">
+      <footer className="v1-footer">
+        <div className="bc-shell ep-footer-grid">
+          <div className="v1-footer-brand">
+            <button type="button" onClick={() => navigatePublic("home")} aria-label="Balancing Carbon home"><AsymmetricInfinityLogo size="md" variant="dark" /></button>
+            <p>Governed carbon intelligence for organisations that need to measure, report and act with confidence.</p>
+            <button className="v1-client-link" onClick={() => { setIsSignUpMode(false); navigatePublic("login"); }}>Open client portal <ArrowRight /></button>
+          </div>
+          <div>
+            <h3>Platform</h3>
+            <button onClick={() => navigatePublic("services")}>Services</button>
+            <button onClick={() => navigatePublic("industries")}>Industries</button>
+            <button onClick={() => navigatePublic("ai")}>Governed AI</button>
+            <button onClick={() => navigatePublic("tools")}>Interactive tools</button>
+            <button onClick={() => navigatePublic("pricing")}>Pricing</button>
+          </div>
+          <div>
+            <h3>Resources</h3>
+            <button onClick={() => navigatePublic("insights")}>Insights</button>
+            <button onClick={() => navigatePublic("case-studies")}>Case studies</button>
+            <button onClick={() => navigatePublic("frameworks")}>Framework library</button>
+            <button onClick={() => navigatePublic("trust")}>Trust centre</button>
+            <button onClick={() => navigatePublic("faq")}>FAQ</button>
+          </div>
+          <div>
+            <h3>Company</h3>
+            <button onClick={() => navigatePublic("about")}>About</button>
+            <button onClick={() => navigatePublic("partners")}>Partners</button>
+            <button onClick={() => navigatePublic("careers")}>Careers</button>
+            <button onClick={() => navigatePublic("press")}>Press</button>
+            <button onClick={() => navigatePublic("media-kit")}>Media kit</button>
+          </div>
+          <div>
+            <h3>Contact</h3>
+            <span>New Delhi, India</span>
+            <a href="mailto:info@balancingcarbon.com">info@balancingcarbon.com</a>
+            <button onClick={() => navigatePublic("contact")}>Book consultation</button>
+          </div>
+        </div>
+        <div className="bc-shell v1-footer-bottom ep-footer-bottom"><p>&copy; 2026 Balancing Carbon. All rights reserved.</p><div><button onClick={() => navigatePublic("privacy")}>Privacy</button><button onClick={() => navigatePublic("terms")}>Terms</button><button onClick={() => navigatePublic("cookies")}>Cookies</button></div></div>
+        <div className="bc-shell v1-footer-bottom"><p>© 2026 Balancing Carbon. All rights reserved.</p><div><span>Privacy Policy</span><span>Terms & Conditions</span></div></div>
+      </footer>
+      <footer className="hidden bc-site-footer bg-brand-charcoal text-white border-t border-white/5 py-12 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-xs text-gray-400">
           <div className="space-y-3">
             <AsymmetricInfinityLogo size="sm" variant="dark" />
@@ -2215,12 +2391,12 @@ export default function App() {
 
           <div className="space-y-2">
             <strong className="text-white font-mono uppercase tracking-wide block">
-              Secure Tenancy
+              Company
             </strong>
             <span className="block font-mono text-[10px]">
-              CLAIM: multi-tenant-isolated
+              Private, multi-tenant workspaces
             </span>
-            <span className="block">Active Port: 3000 (Cloud Run)</span>
+            <button onClick={() => setCurrentView("about")} className="block hover:text-white hover:underline">About Balancing Carbon</button>
             <span className="block">© 2026 Balancing Carbon Inc.</span>
           </div>
         </div>

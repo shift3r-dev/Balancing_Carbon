@@ -8,7 +8,13 @@ const snapshot = buildReportSnapshot([
 ]);
 
 test('report snapshots preserve scope and provenance totals', () => {
-  assert.equal(snapshot.emissionsTco2e, 15.7); assert.equal(snapshot.scope1Tco2e, 3.2); assert.equal(snapshot.scope2Tco2e, 12.5); assert.equal(snapshot.calculationReferences.length, 2);
+  assert.equal(snapshot.emissionsTco2e, 15.7); assert.equal(snapshot.scope1Tco2e, 3.2); assert.equal(snapshot.scope2Tco2e, 12.5); assert.equal(snapshot.scope3Tco2e, 0); assert.equal(snapshot.calculationReferences.length, 2);
+});
+test('Scope 3 calculations are included in report totals and exports', () => {
+  const valueChain = buildReportSnapshot([{ id: 'calc-3', emissions_t_co2e: 8.4, factor_version: 'supplier-1', activity: { id: 'activity-3', source_type: 'Purchased steel', scope: 'scope-3', facility_id: 'facility-1', verification_status: 'approved', evidence_count: 1 } }]);
+  assert.equal(valueChain.scope3Tco2e, 8.4); assert.equal(valueChain.emissionsTco2e, 8.4);
+  const report = { title: 'Value-chain report', type: 'Carbon Report', period: 'FY26', currentVersion: { calculation_snapshot: valueChain } };
+  assert.match(createCsvExport(report), /Scope 3/);
 });
 test('report validation requires review when evidence or approval is incomplete', () => {
   const validation = validateReportSnapshot(snapshot); assert.equal(validation.status, 'needs-review'); assert.equal(validation.metrics.activityEvidenceCoverage, 50); assert.equal(validation.metrics.approvedActivityCoverage, 50);

@@ -268,5 +268,5 @@ Before onboarding real customers:
 - **Factor error:** confirm the source type has an active registry factor for the facility country and date.
 - **Unit error:** select a compatible unit from the central registry.
 - **Dashboard is unchanged:** confirm the row is posted and within the active reporting period.
-- **Copilot is offline:** confirm Ollama is running and the configured model is installed.
+- **Copilot is offline:** confirm the configured AI provider is enabled, its server-side credential is present, and the selected model is available.
 - **Document has no excerpts:** check extraction status; scanned PDFs require a future OCR service.

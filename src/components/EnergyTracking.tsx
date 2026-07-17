@@ -50,6 +50,8 @@ export default function EnergyTracking({
   const [filterPeriod, setFilterPeriod] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [activityError, setActivityError] = useState('');
+  const [productionError, setProductionError] = useState('');
 
   const selectedSource = sourceOptions.find((option) => option.sourceType === sourceType) ?? sourceOptions[0] ?? { sourceType: '', scope: 'scope-1' as const, unit: '' };
 
@@ -102,8 +104,9 @@ export default function EnergyTracking({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!facilityId || !sourceType || !quantity || !sourceDocument.trim()) {
-      alert('Please enter activity details and an evidence reference.');
+    setActivityError('');
+    if (!facilityId || !sourceType || !quantity || Number(quantity) <= 0 || !sourceDocument.trim()) {
+      setActivityError('Select a facility and source, enter a positive quantity, and provide an evidence reference.');
       return;
     }
 
@@ -130,8 +133,9 @@ export default function EnergyTracking({
 
   const handleProductionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!onAddProduction || !productionFacilityId || !productionQuantity || !productionUnit) {
-      alert('Please enter required production output details.');
+    setProductionError('');
+    if (!onAddProduction || !productionFacilityId || !productionQuantity || Number(productionQuantity) <= 0 || !productionUnit.trim()) {
+      setProductionError('Select a facility and enter a positive production quantity with its unit.');
       return;
     }
 
@@ -150,6 +154,18 @@ export default function EnergyTracking({
     setProductionNotes('');
   };
 
+  const downloadCsvTemplate = () => {
+    const content = 'facility_id,date,reporting_period,source_type,quantity,unit,source_document,notes\n';
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'balancing-carbon-activity-template.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const filteredRecords = records.filter((record) => {
     const recordSource = record.sourceType || record.energyType;
     const matchFac = filterFacility === 'all' || record.facilityId === filterFacility;
@@ -163,7 +179,7 @@ export default function EnergyTracking({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-5 rounded-xl border border-brand-border">
+      <div className="flex flex-col items-stretch gap-3 bg-white p-5 rounded-xl border border-brand-border sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-brand-charcoal">Energy & Fuel Activity Ledger</h1>
           <p className="text-xs text-gray-500 font-mono mt-0.5">
@@ -178,7 +194,7 @@ export default function EnergyTracking({
               setShowAddForm(true);
             }
           }}
-          className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+          className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> {showAddForm ? 'Close Entry Form' : 'Log Activity Record'}
         </button>
@@ -194,8 +210,8 @@ export default function EnergyTracking({
             <form onSubmit={handleSubmit} className="text-xs space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Target Facility *</label>
-                  <select value={facilityId} onChange={(e) => setFacilityId(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs" required>
+                  <label htmlFor="activity-facility" className="block font-mono text-gray-500 mb-1">Target Facility *</label>
+                  <select id="activity-facility" value={facilityId} onChange={(e) => setFacilityId(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs" required>
                     <option value="">Select Facility</option>
                     {facilities.map((facility) => (
                       <option key={facility.id} value={facility.id}>{facility.name}</option>
@@ -203,29 +219,29 @@ export default function EnergyTracking({
                   </select>
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Log Date *</label>
-                  <input type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
+                  <label htmlFor="activity-date" className="block font-mono text-gray-500 mb-1">Log Date *</label>
+                  <input id="activity-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Reporting Period *</label>
-                  <input type="text" required value={reportingPeriod} onChange={(e) => setReportingPeriod(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
+                  <label htmlFor="activity-period" className="block font-mono text-gray-500 mb-1">Reporting Period *</label>
+                  <input id="activity-period" type="text" required value={reportingPeriod} onChange={(e) => setReportingPeriod(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Source Type *</label>
-                  <select value={sourceType} onChange={(e) => handleSourceChange(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs font-mono" required>
+                  <label htmlFor="activity-source" className="block font-mono text-gray-500 mb-1">Source Type *</label>
+                  <select id="activity-source" value={sourceType} onChange={(e) => handleSourceChange(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs font-mono" required>
                     {sourceOptions.map((option) => (
                       <option key={option.sourceType} value={option.sourceType}>{option.sourceType}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Activity Quantity *</label>
+                  <label htmlFor="activity-quantity" className="block font-mono text-gray-500 mb-1">Activity Quantity *</label>
                   <div className="flex">
-                    <input type="number" min="0" step="any" required placeholder="e.g. 425000" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full border border-brand-border p-2.5 rounded-l text-xs bg-brand-offwhite font-mono" />
-                    <select value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-brand-sage text-brand-forest border-y border-r border-brand-border px-2 rounded-r font-mono font-semibold min-w-24">
+                    <input id="activity-quantity" type="number" min="0" step="any" required placeholder="e.g. 425000" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="w-full border border-brand-border p-2.5 rounded-l text-xs bg-brand-offwhite font-mono" />
+                    <select aria-label="Activity unit" value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-brand-sage text-brand-forest border-y border-r border-brand-border px-2 rounded-r font-mono font-semibold min-w-24">
                       {unitOptions.map((option) => <option key={option.id} value={option.code}>{option.symbol || option.code}</option>)}
                     </select>
                   </div>
@@ -234,16 +250,18 @@ export default function EnergyTracking({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Evidence Reference *</label>
-                  <input type="text" required placeholder="e.g. IOCL_Invoice_778.pdf" value={sourceDocument} onChange={(e) => setSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+                  <label htmlFor="activity-evidence" className="block font-mono text-gray-500 mb-1">Evidence Reference *</label>
+                  <input id="activity-evidence" type="text" required placeholder="e.g. IOCL_Invoice_778.pdf" value={sourceDocument} onChange={(e) => setSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Internal Notes</label>
-                  <input type="text" placeholder="e.g. April generator diesel purchase" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+                  <label htmlFor="activity-notes" className="block font-mono text-gray-500 mb-1">Internal Notes</label>
+                  <input id="activity-notes" type="text" placeholder="e.g. April generator diesel purchase" value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
                 </div>
               </div>
 
               <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono text-brand-forest"><div><span className="text-[10px] uppercase font-bold tracking-wider text-brand-green-sec block">Registry-backed calculation</span><p className="mt-1">An active versioned emission factor will be selected and recorded when this activity is saved.</p></div><div className="text-left sm:text-right text-brand-charcoal"><span className="text-[10px] text-gray-400 block">Scope Classification</span><span className="font-bold">{selectedSource.scope === 'scope-2' ? 'Scope 2 Location-Based' : 'Scope 1 Direct'}</span></div></div>
+
+              {activityError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-red-700">{activityError}</div>}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={resetActivityForm} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs transition-all cursor-pointer">
@@ -265,22 +283,26 @@ export default function EnergyTracking({
                 Add output records for period-specific carbon intensity. Tonne-based records feed the dashboard intensity calculation.
               </p>
 
-              <select value={productionFacilityId} onChange={(e) => setProductionFacilityId(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs" required>
+              <label htmlFor="production-facility" className="font-mono text-gray-500">Facility *</label>
+              <select id="production-facility" value={productionFacilityId} onChange={(e) => setProductionFacilityId(e.target.value)} className="w-full border border-brand-border p-2.5 rounded bg-white text-xs" required>
                 <option value="">Select Facility</option>
                 {facilities.map((facility) => (
                   <option key={facility.id} value={facility.id}>{facility.name}</option>
                 ))}
               </select>
               <div className="grid grid-cols-2 gap-2">
-                <input type="date" required value={productionDate} onChange={(e) => setProductionDate(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
-                <input type="text" required value={productionReportingPeriod} onChange={(e) => setProductionReportingPeriod(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
+                <div><label htmlFor="production-date" className="mb-1 block font-mono text-gray-500">Date *</label><input id="production-date" type="date" required value={productionDate} onChange={(e) => setProductionDate(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" /></div>
+                <div><label htmlFor="production-period" className="mb-1 block font-mono text-gray-500">Period *</label><input id="production-period" type="text" required value={productionReportingPeriod} onChange={(e) => setProductionReportingPeriod(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" /></div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input type="number" min="0" step="any" required placeholder="Output quantity" value={productionQuantity} onChange={(e) => setProductionQuantity(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
-                <input type="text" required value={productionUnit} onChange={(e) => setProductionUnit(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" />
+                <div><label htmlFor="production-quantity" className="mb-1 block font-mono text-gray-500">Quantity *</label><input id="production-quantity" type="number" min="0" step="any" required placeholder="Output quantity" value={productionQuantity} onChange={(e) => setProductionQuantity(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" /></div>
+                <div><label htmlFor="production-unit" className="mb-1 block font-mono text-gray-500">Unit *</label><input id="production-unit" type="text" required value={productionUnit} onChange={(e) => setProductionUnit(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite font-mono" /></div>
               </div>
-              <input type="text" placeholder="Production evidence document" value={productionSourceDocument} onChange={(e) => setProductionSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
-              <input type="text" placeholder="Notes" value={productionNotes} onChange={(e) => setProductionNotes(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+              <label htmlFor="production-evidence" className="sr-only">Production evidence document</label>
+              <input id="production-evidence" type="text" placeholder="Production evidence document" value={productionSourceDocument} onChange={(e) => setProductionSourceDocument(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+              <label htmlFor="production-notes" className="sr-only">Production notes</label>
+              <input id="production-notes" type="text" placeholder="Notes" value={productionNotes} onChange={(e) => setProductionNotes(e.target.value)} className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite" />
+              {productionError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-red-700">{productionError}</div>}
               <button type="submit" className="w-full px-4 py-2 bg-brand-forest hover:bg-brand-green-sec text-white rounded text-xs font-bold transition-all cursor-pointer">
                 Commit Production Output
               </button>
@@ -292,10 +314,10 @@ export default function EnergyTracking({
               </h3>
               <div className="border border-dashed border-brand-border/80 bg-brand-offwhite rounded-lg p-4 text-center">
                 <Upload className="w-7 h-7 text-brand-forest mx-auto mb-2 opacity-60" />
-                <span className="text-xs font-bold block text-brand-charcoal">Bulk Upload Placeholder</span>
-                <span className="text-[10px] text-gray-400 block mt-1 font-mono">CSV/PDF ingestion can attach here later</span>
+                <span className="text-xs font-bold block text-brand-charcoal">Prepare an activity import</span>
+                <span className="text-[10px] text-gray-400 block mt-1 font-mono">Complete the template, then import it through Data Hub.</span>
               </div>
-              <button onClick={() => alert('CSV template downloading... Please configure facility IDs, source types, quantities, and units.')} className="w-full text-xs font-mono font-bold bg-white text-brand-charcoal hover:bg-gray-50 border border-brand-border p-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all">
+              <button type="button" onClick={downloadCsvTemplate} className="w-full text-xs font-mono font-bold bg-white text-brand-charcoal hover:bg-gray-50 border border-brand-border p-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-all">
                 <FileSpreadsheet className="w-4 h-4 text-brand-forest" /> Download CSV Template
               </button>
             </div>
@@ -336,26 +358,26 @@ export default function EnergyTracking({
             <Filter className="w-4 h-4 text-brand-forest" /> Activity Ledger ({filteredRecords.length} entries)
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 text-xs w-full xl:w-auto">
-            <select value={filterFacility} onChange={(e) => setFilterFacility(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
+            <select aria-label="Filter by facility" value={filterFacility} onChange={(e) => setFilterFacility(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
               <option value="all">All Facilities</option>
               {facilities.map((facility) => (
                 <option key={facility.id} value={facility.id}>{facility.name.replace(' Manufacturing Plant', '').replace(' Component Facility', '')}</option>
               ))}
             </select>
-            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
+            <select aria-label="Filter by source" value={filterType} onChange={(e) => setFilterType(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
               <option value="all">All Sources</option>
               {sourceOptions.map((option) => (
                 <option key={option.sourceType} value={option.sourceType}>{option.sourceType}</option>
               ))}
             </select>
-            <select value={filterScope} onChange={(e) => setFilterScope(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
+            <select aria-label="Filter by scope" value={filterScope} onChange={(e) => setFilterScope(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono">
               <option value="all">All Scopes</option>
               <option value="scope-1">Scope 1</option>
               <option value="scope-2">Scope 2</option>
             </select>
-            <input value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} placeholder="Reporting period" className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
-            <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
-            <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
+            <input aria-label="Filter by reporting period" value={filterPeriod} onChange={(e) => setFilterPeriod(e.target.value)} placeholder="Reporting period" className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
+            <input aria-label="Filter from date" type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
+            <input aria-label="Filter to date" type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="border border-brand-border p-2 rounded bg-brand-offwhite text-xs font-mono" />
           </div>
         </div>
 
@@ -410,7 +432,9 @@ export default function EnergyTracking({
                         <div className="inline-flex items-center gap-1">
                           {onUpdateRecord && (
                             <button
+                              type="button"
                               onClick={() => handleEditRecord(record)}
+                              aria-label={`Edit ${displaySource} activity from ${record.date}`}
                               className="inline-flex items-center justify-center w-8 h-8 rounded border border-brand-border text-brand-forest hover:bg-brand-sage/20 transition-colors"
                               title="Edit activity record"
                             >
@@ -419,7 +443,9 @@ export default function EnergyTracking({
                           )}
                           {onDeleteRecord && (
                             <button
+                              type="button"
                               onClick={() => onDeleteRecord(record.id)}
+                              aria-label={`Delete ${displaySource} activity from ${record.date}`}
                               className="inline-flex items-center justify-center w-8 h-8 rounded border border-red-100 text-brand-red hover:bg-red-50 transition-colors"
                               title="Delete activity record"
                             >

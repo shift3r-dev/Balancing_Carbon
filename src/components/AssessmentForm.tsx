@@ -137,7 +137,7 @@ export default function AssessmentForm({ onLoginRequest }: AssessmentFormProps) 
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-brand-charcoal">Free B2B ESG Readiness Assessment</h2>
+              <h1 className="text-xl font-bold text-brand-charcoal">Free B2B ESG Readiness Assessment</h1>
               <p className="text-xs text-gray-500 font-mono mt-1">
                 Evaluation aligned with Tata Motors, Mahindra, and major global OEM sustainability matrices
               </p>

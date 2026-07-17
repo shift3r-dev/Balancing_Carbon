@@ -8,7 +8,21 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, './src'),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const normalized = id.replaceAll('\\', '/');
+            if (!normalized.includes('/node_modules/')) return undefined;
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(normalized)) return 'vendor-react';
+            if (normalized.includes('/node_modules/lucide-react/')) return 'vendor-icons';
+            if (normalized.includes('/node_modules/recharts/') || normalized.includes('/node_modules/d3-')) return 'vendor-charts';
+            return undefined;
+          },
+        },
       },
     },
     server: {

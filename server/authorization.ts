@@ -9,8 +9,9 @@ export interface AuthorizationContext {
 }
 
 export async function getAuthorizationContext(userId: string): Promise<AuthorizationContext> {
-  const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('organisation_id').eq('id', userId).single();
+  const { data: profile, error: profileError } = await supabaseAdmin.from('profiles').select('organisation_id,status').eq('id', userId).single();
   if (profileError || !profile) throw new Error('Profile lookup failed.');
+  if (profile.status && profile.status !== 'active') throw new Error('This user account is not active. Contact a platform administrator.');
   const { data: memberships, error } = await supabaseAdmin
     .from('user_roles')
     .select('role_id, roles(name, role_permissions(permissions(key)))')

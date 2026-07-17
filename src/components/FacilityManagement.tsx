@@ -24,6 +24,7 @@ export default function FacilityManagement({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [metadataFacility, setMetadataFacility] = useState<Facility | null>(null);
+  const [formMessage, setFormMessage] = useState('');
 
   // Form states
   const [name, setName] = useState('');
@@ -54,8 +55,9 @@ export default function FacilityManagement({
     } else {
       if (compareIds.length < 3) {
         setCompareIds([...compareIds, id]);
+        setFormMessage('');
       } else {
-        alert('You can compare a maximum of 3 facilities side-by-side.');
+        setFormMessage('You can compare a maximum of 3 facilities side-by-side.');
       }
     }
   };
@@ -71,6 +73,7 @@ export default function FacilityManagement({
     setFuelConsumption('');
     setFuelType('Diesel');
     setRenewableEnergyUsage('');
+    setFormMessage('');
     setShowAddModal(true);
   };
 
@@ -91,7 +94,7 @@ export default function FacilityManagement({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !location || !industryType) {
-      alert('Please fill out all required fields.');
+      setFormMessage('Please complete the required facility fields.');
       return;
     }
 
@@ -119,7 +122,7 @@ export default function FacilityManagement({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-5 rounded-xl border border-brand-border">
+      <div className="flex flex-col items-stretch gap-3 bg-white p-5 rounded-xl border border-brand-border sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-brand-charcoal">Facility Management</h1>
           <p className="text-xs text-gray-500 font-mono mt-0.5">
@@ -128,11 +131,12 @@ export default function FacilityManagement({
         </div>
         <button
           onClick={handleOpenAdd}
-          className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+          className="bg-brand-forest hover:bg-brand-green-sec text-white px-4 py-2.5 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Factory Unit
         </button>
       </div>
+      {formMessage && <div role="alert" className="border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">{formMessage}</div>}
 
       {/* Facilities Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -154,10 +158,12 @@ export default function FacilityManagement({
                     {f.esgReadinessStatus}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => setMetadataFacility(f)} className="p-1.5 text-gray-400 hover:text-brand-forest rounded hover:bg-gray-100" title="Open custom facility profile"><Database className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={() => setMetadataFacility(f)} className="p-1.5 text-gray-400 hover:text-brand-forest rounded hover:bg-gray-100" aria-label={`Open custom profile for ${f.name}`} title="Open custom facility profile"><Database className="w-3.5 h-3.5" /></button>
                     <button
                       type="button"
                       onClick={() => handleToggleCompare(f.id)}
+                      aria-pressed={isComparing}
+                      aria-label={`${isComparing ? 'Remove' : 'Add'} ${f.name} ${isComparing ? 'from' : 'to'} comparison`}
                       className={`p-1.5 rounded border text-[10px] font-mono ${
                         isComparing ? 'bg-brand-forest text-white border-brand-forest' : 'bg-brand-offwhite text-gray-500 hover:bg-brand-sage/20 border-brand-border'
                       }`}
@@ -165,17 +171,23 @@ export default function FacilityManagement({
                       Compare
                     </button>
                     <button
+                      type="button"
                       onClick={() => handleOpenEdit(f)}
+                      aria-label={`Edit ${f.name}`}
+                      title={`Edit ${f.name}`}
                       className="p-1 text-gray-400 hover:text-brand-forest rounded hover:bg-gray-100"
                     >
                       <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      type="button"
                       onClick={() => {
                         if (confirm(`Are you sure you want to delete ${f.name}?`)) {
                           onDeleteFacility(f.id);
                         }
                       }}
+                      aria-label={`Delete ${f.name}`}
+                      title={`Delete ${f.name}`}
                       className="p-1 text-gray-400 hover:text-brand-red rounded hover:bg-gray-100"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -186,7 +198,7 @@ export default function FacilityManagement({
                 <h3 className="font-bold text-brand-charcoal text-sm leading-snug mb-1">{f.name}</h3>
                 <div className="mb-2 flex items-center gap-1.5 rounded border border-brand-border bg-brand-offwhite px-2 py-1.5">
                   <span className="min-w-0 flex-1 truncate font-mono text-[9px] text-gray-500" title={f.id}>ID: {f.id}</span>
-                  <button type="button" onClick={async () => { await navigator.clipboard.writeText(f.id); setCopiedId(f.id); window.setTimeout(() => setCopiedId(null), 1500); }} className="shrink-0 p-1 text-brand-forest hover:bg-brand-sage rounded" title="Copy facility ID">{copiedId === f.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}</button>
+                  <button type="button" onClick={async () => { await navigator.clipboard.writeText(f.id); setCopiedId(f.id); window.setTimeout(() => setCopiedId(null), 1500); }} className="shrink-0 p-1 text-brand-forest hover:bg-brand-sage rounded" title="Copy facility ID" aria-label={`Copy facility ID for ${f.name}`}>{copiedId === f.id ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}</button>
                 </div>
                 <div className="text-[10px] text-gray-500 font-mono flex items-center gap-1 mb-4">
                   <MapPin className="w-3 h-3 text-gray-400" /> {f.location}
@@ -238,6 +250,7 @@ export default function FacilityManagement({
               <Scale className="w-4 h-4 text-brand-forest" /> Side-by-Side Facility Comparison ({compareIds.length})
             </h2>
             <button 
+              type="button"
               onClick={() => setCompareIds([])} 
               className="text-[10px] font-mono text-brand-red hover:underline"
             >
@@ -283,12 +296,12 @@ export default function FacilityManagement({
       {/* Add / Edit Factory Modal */}
       {showAddModal ? createPortal(
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-3 sm:p-4 z-[1000]">
-          <div className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-lg w-full max-h-[calc(100svh-1.5rem)] sm:max-h-[calc(100svh-2rem)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+          <div role="dialog" aria-modal="true" aria-labelledby="facility-dialog-title" className="bg-white rounded-xl border border-brand-border shadow-2xl max-w-lg w-full max-h-[calc(100svh-1.5rem)] sm:max-h-[calc(100svh-2rem)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
             <div className="shrink-0 flex justify-between items-center bg-brand-charcoal text-white p-4">
-              <h3 className="font-bold text-sm font-mono uppercase tracking-wider flex items-center gap-2">
+              <h3 id="facility-dialog-title" className="font-bold text-sm font-mono uppercase tracking-wider flex items-center gap-2">
                 <Building className="w-4 h-4 text-brand-forest" /> {editingId ? 'Edit Factory Parameters' : 'Register New Manufacturing Plant'}
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
+              <button type="button" onClick={() => setShowAddModal(false)} aria-label="Close facility form" title="Close" className="text-gray-400 hover:text-white transition-colors cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -297,8 +310,9 @@ export default function FacilityManagement({
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Facility Name *</label>
+                  <label htmlFor="facility-name" className="block font-mono text-gray-500 mb-1">Facility Name *</label>
                   <input
+                    id="facility-name"
                     type="text"
                     required
                     placeholder="e.g. Pune Component Facility"
@@ -308,8 +322,9 @@ export default function FacilityManagement({
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Location Address *</label>
+                  <label htmlFor="facility-location" className="block font-mono text-gray-500 mb-1">Location Address *</label>
                   <input
+                    id="facility-location"
                     type="text"
                     required
                     placeholder="e.g. Chakan, Pune"
@@ -322,8 +337,9 @@ export default function FacilityManagement({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Industrial Type / Line *</label>
+                  <label htmlFor="facility-industry" className="block font-mono text-gray-500 mb-1">Industrial Type / Line *</label>
                   <input
+                    id="facility-industry"
                     type="text"
                     required
                     placeholder="e.g. Forging & Metal Stamping"
@@ -333,10 +349,12 @@ export default function FacilityManagement({
                   />
                 </div>
                 <div>
-                  <label className="block font-mono text-gray-500 mb-1">Production Unit Output *</label>
+                  <label htmlFor="facility-production-output" className="block font-mono text-gray-500 mb-1">Production Unit Output *</label>
                   <div className="flex gap-1">
                     <input
+                      id="facility-production-output"
                       type="number"
+                      min="0"
                       required
                       placeholder="e.g. 15000"
                       value={productionOutput}
@@ -344,6 +362,7 @@ export default function FacilityManagement({
                       className="w-full border border-brand-border p-2.5 rounded text-xs bg-brand-offwhite"
                     />
                     <select
+                      aria-label="Production unit"
                       value={productionUnit}
                       onChange={(e) => setProductionUnit(e.target.value)}
                       className="border border-brand-border px-2 rounded bg-white text-xs font-mono"
@@ -362,9 +381,11 @@ export default function FacilityManagement({
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block font-mono text-gray-500 mb-1">Electricity Base (kWh / Yr)</label>
+                    <label htmlFor="facility-electricity" className="block font-mono text-gray-500 mb-1">Electricity Base (kWh / Yr)</label>
                     <input
+                      id="facility-electricity"
                       type="number"
+                      min="0"
                       placeholder="e.g. 450000"
                       value={electricityConsumption}
                       onChange={(e) => setElectricityConsumption(e.target.value)}
@@ -372,9 +393,11 @@ export default function FacilityManagement({
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-gray-500 mb-1">On-site Rooftop Solar (kWh / Yr)</label>
+                    <label htmlFor="facility-renewable" className="block font-mono text-gray-500 mb-1">On-site Rooftop Solar (kWh / Yr)</label>
                     <input
+                      id="facility-renewable"
                       type="number"
+                      min="0"
                       placeholder="e.g. 100000"
                       value={renewableEnergyUsage}
                       onChange={(e) => setRenewableEnergyUsage(e.target.value)}
@@ -385,9 +408,11 @@ export default function FacilityManagement({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                   <div>
-                    <label className="block font-mono text-gray-500 mb-1">Fuel Consumption (Qty / Yr)</label>
+                    <label htmlFor="facility-fuel-consumption" className="block font-mono text-gray-500 mb-1">Fuel Consumption (Qty / Yr)</label>
                     <input
+                      id="facility-fuel-consumption"
                       type="number"
+                      min="0"
                       placeholder="e.g. 12000"
                       value={fuelConsumption}
                       onChange={(e) => setFuelConsumption(e.target.value)}
@@ -395,8 +420,9 @@ export default function FacilityManagement({
                     />
                   </div>
                   <div>
-                    <label className="block font-mono text-gray-500 mb-1">Fuel Type</label>
+                    <label htmlFor="facility-fuel-type" className="block font-mono text-gray-500 mb-1">Fuel Type</label>
                     <select
+                      id="facility-fuel-type"
                       value={fuelType}
                       onChange={(e) => setFuelType(e.target.value)}
                       className="w-full border border-brand-border p-2.5 rounded text-xs bg-white font-mono"

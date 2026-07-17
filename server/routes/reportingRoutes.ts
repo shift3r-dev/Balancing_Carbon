@@ -111,7 +111,7 @@ export function createReportingRouter() {
       const row = {
         id: `rep-${randomUUID()}`, organisation_id: p.organisation_id, title,
         type: str(b.type) || 'Executive Summary', period: str(b.period) || 'FY 2025-26',
-        created_date: new Date().toISOString().split('T')[0], summary: str(b.summary), status: 'Generated', download_url: '#',
+        created_date: new Date().toISOString().split('T')[0], summary: str(b.summary), status: 'Generated', download_url: '',
       };
       const { data, error } = await supabaseAdmin.from('reports').insert(row).select('*').single();
       if (error || !data) return res.status(500).json({ error: error?.message ?? 'Failed to create report.' });

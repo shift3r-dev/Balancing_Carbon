@@ -1,4 +1,5 @@
-export type ActivityScope = 'scope-1' | 'scope-2';
+export type ActivityScope = 'scope-1' | 'scope-2' | 'scope-3';
+export type CalculationMethod = 'activity-factor' | 'distance-factor' | 'spend-factor' | 'refrigerant-balance' | 'fuel-efficiency' | 'supplier-specific';
 export type ActivityType =
   | 'electricity'
   | 'renewable-electricity'
@@ -50,6 +51,24 @@ export interface ActivityCalculationResult {
   calculatedAt: string;
 }
 
+export interface ProfessionalCalculationInput extends ActivityCalculationInput {
+  method?: CalculationMethod;
+  beginningInventory?: number | string;
+  purchases?: number | string;
+  endingInventory?: number | string;
+  recoveredOrReturned?: number | string;
+  distance?: number | string;
+  fuelEfficiency?: number | string;
+}
+
+export interface ProfessionalCalculationResult extends ActivityCalculationResult {
+  calculationMethod: CalculationMethod;
+  formula: string;
+  inputSnapshot: Record<string, number | string>;
+  confidenceScore: number;
+  warnings: string[];
+}
+
 export interface AggregatedActivityRecord {
   facilityId: string;
   sourceType: string;
@@ -88,6 +107,14 @@ const unitAliases: Record<string, string> = {
   'm³': 'SCM',
   tonne: 'tonne',
   tonnes: 'tonne',
+  mwh: 'MWh',
+  gj: 'GJ',
+  nm3: 'Nm3',
+  'tonne-km': 'tonne-km',
+  'passenger-km': 'passenger-km',
+  'vehicle-km': 'vehicle-km',
+  inr: 'INR',
+  usd: 'USD',
 };
 
 export const prototypeEmissionFactors: EmissionFactor[] = [
@@ -386,6 +413,52 @@ export function calculateActivityEmissions(input: ActivityCalculationInput): Act
     factorVersion: input.emissionFactor.version,
     calculatedAt: new Date().toISOString(),
   };
+}
+
+function finiteNonNegative(value: number | string | undefined, label: string, fallback = 0) {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${label} must be a non-negative finite number.`);
+  return parsed;
+}
+
+export function calculateProfessionalEmissions(input: ProfessionalCalculationInput): ProfessionalCalculationResult {
+  const method = input.method ?? 'activity-factor';
+  let activityQuantity = finiteNonNegative(input.quantity, 'Activity quantity');
+  const snapshot: Record<string, number | string> = { method, reportedQuantity: activityQuantity, reportedUnit: input.activityUnit };
+  const warnings: string[] = [];
+  let formula = 'activity quantity x emission factor';
+
+  if (method === 'refrigerant-balance') {
+    const beginning = finiteNonNegative(input.beginningInventory, 'Beginning inventory');
+    const purchases = finiteNonNegative(input.purchases, 'Purchases');
+    const ending = finiteNonNegative(input.endingInventory, 'Ending inventory');
+    const returned = finiteNonNegative(input.recoveredOrReturned, 'Recovered or returned amount');
+    activityQuantity = beginning + purchases - ending - returned;
+    if (activityQuantity < 0) throw new Error('Refrigerant balance cannot produce a negative release. Check inventory and recovery values.');
+    Object.assign(snapshot, { beginningInventory: beginning, purchases, endingInventory: ending, recoveredOrReturned: returned, calculatedRelease: activityQuantity });
+    formula = '(beginning inventory + purchases - ending inventory - recovered) x GWP factor';
+  } else if (method === 'fuel-efficiency') {
+    const distance = finiteNonNegative(input.distance, 'Distance');
+    const efficiency = finiteNonNegative(input.fuelEfficiency, 'Fuel efficiency');
+    if (efficiency <= 0) throw new Error('Fuel efficiency must be greater than zero.');
+    activityQuantity = distance / efficiency;
+    Object.assign(snapshot, { distance, fuelEfficiency: efficiency, calculatedFuel: activityQuantity });
+    formula = '(distance / fuel efficiency) x fuel emission factor';
+  } else if (method === 'distance-factor') {
+    formula = 'transport activity (distance or tonne-km) x emission factor';
+  } else if (method === 'spend-factor') {
+    formula = 'spend in factor currency x environmentally extended input-output factor';
+    warnings.push('Spend-based estimates have lower data quality than supplier-specific or physical activity data.');
+  } else if (method === 'supplier-specific') {
+    formula = 'supplier activity quantity x supplier-specific product or service factor';
+  }
+
+  const calculated = calculateActivityEmissions({ ...input, quantity: activityQuantity });
+  const confidenceScore = method === 'supplier-specific' ? 90 : method === 'spend-factor' ? 55 : method === 'distance-factor' ? 75 : 85;
+  if (!input.emissionFactor.sourceReference) warnings.push('The selected factor has no source reference; review it before approval.');
+
+  return { ...calculated, calculationMethod: method, formula, inputSnapshot: snapshot, confidenceScore, warnings };
 }
 
 export function aggregateFacilityActivities(

@@ -2,14 +2,15 @@
 
 ## Status
 
-Phase 8 now provides a local-first, read-only Carbon Copilot using Ollama. No external AI provider or paid API is connected.
+Phase 8 provides a provider-neutral, read-only Carbon Copilot. It supports hosted Google Gemini and optional local Ollama while preserving the same tenant grounding, citations, usage logging, and no-write boundary.
 
 ## Deployment
 
 1. Apply `server/migrations/022_ai_carbon_copilot.sql` after migration `021`.
 2. Apply `server/migrations/023_governed_document_grounding.sql` after migration `022`.
-3. Install and run the configured model: `ollama run qwen3:8b`.
-4. Configure `.env`:
+3. Choose one provider and configure `.env`.
+
+Local Ollama:
 
 ```env
 AI_ENABLED=true
@@ -22,7 +23,21 @@ AI_ALLOW_EXTERNAL=false
 SUPABASE_STORAGE_BUCKET=evidence
 ```
 
-5. Restart the Balancing Carbon server.
+Hosted Google Gemini:
+
+```env
+AI_ENABLED=true
+AI_PROVIDER=gemini
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+GEMINI_MODEL=gemini-3.5-flash
+GEMINI_API_KEY=your-server-side-key
+AI_TIMEOUT_MS=120000
+AI_ALLOW_EXTERNAL=true
+SUPABASE_STORAGE_BUCKET=evidence
+```
+
+4. For Ollama, install and run the configured model: `ollama run qwen3:8b`.
+5. Restart or redeploy the Balancing Carbon server.
 
 ## Security and calculation boundaries
 
@@ -35,12 +50,13 @@ SUPABASE_STORAGE_BUCKET=evidence
 - The model may explain recorded calculations but cannot create or modify activity, factors, reports, projects, or evidence.
 - Responses cite a bounded catalog of facilities, energy records, reports, documents, and projects.
 - Provider/model, latency, token counts, outcome, and citation count are written to `ai_usage_events`.
+- Provider credentials are read only by the server and must never use the `VITE_` prefix.
 
 ## API index
 
 | Endpoint | Purpose |
 | --- | --- |
-| `GET /api/ai/status` | Local provider and model health |
+| `GET /api/ai/status` | Configured provider and model health |
 | `GET /api/ai/conversations` | Current user's conversation list |
 | `GET /api/ai/conversations/:id` | Load an owned conversation |
 | `DELETE /api/ai/conversations/:id` | Archive an owned conversation |
@@ -66,14 +82,17 @@ The read-only snapshot includes organisation profile, facility summaries, recent
 
 ## Interaction and oversight
 
-- The chat stream reports context-loading and local-generation phases before returning the persisted answer.
-- Users may cancel an in-progress request; the Ollama HTTP request is aborted and a failed/cancelled usage event is retained.
+- The chat stream reports context-loading and provider-generation phases before returning the persisted answer.
+- Users may cancel an in-progress request; the provider HTTP request is aborted and a failed/cancelled usage event is retained.
 - Citation controls navigate to the corresponding Facilities, Energy, Reports, Documents, or Carbon Intelligence module.
 - Users with `audit.view` see a 30-day summary of requests, failures, average duration, and token counts. Prompt and response text are not exposed in this analytics summary.
 
 ## Current boundaries
 
 - Ollama must be reachable from the backend host. A production server cannot call the Ollama instance on a developer laptop unless it is deployed on an accessible private host.
+- Gemini sends the bounded tenant context to Google's Gemini API. Enable it only after the organisation's data-processing and privacy requirements are accepted.
+- Free-tier Gemini prompts may be used to improve Google's products. Use a paid tier for production data when contractual privacy requirements demand it.
+- Hosted model IDs can be deprecated; monitor Google's model lifecycle and update `GEMINI_MODEL` when necessary.
 - The Copilot does not browse the internet and must not be treated as a regulatory authority.
 - Source citations show which stored records supported the answer; they do not replace assurance review.
 - Scanned image-only PDFs require OCR, which is not included in this local text-extraction phase; these files may produce an `empty` extraction status.

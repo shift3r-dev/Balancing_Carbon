@@ -18,7 +18,7 @@ export interface EnergyRecord {
   activityType: 'electricity' | 'fuel' | 'renewable-electricity' | 'steam' | 'heat' | 'other';
   sourceType: string;
   energyType: string;
-  quantity: number; unit: string; scope: 'scope-1' | 'scope-2';
+  quantity: number; unit: string; scope: 'scope-1' | 'scope-2' | 'scope-3';
   inputQuantity?: number; inputUnit?: string; canonicalQuantity?: number; canonicalUnit?: string; conversionFactor?: number; conversionPath?: string[];
   displayValue?: number; displayUnit?: string;
   emissionFactorId: string; emissionFactorValue: number; emissionFactorUnit: string;
@@ -173,9 +173,12 @@ export interface AIMessage { id: string; sender: 'user' | 'ai'; text: string; ti
 export interface AIConversation { id: string; organisationId: string; title: string; lastUpdated: string; messages: AIMessage[]; }
 export interface AuditLog { id: string; organisationId: string; userId: string; userEmail: string; action: string; details: string; timestamp: string; }
 export type ViewState =
-  | 'home' | 'services' | 'industries' | 'carbon-intelligence' | 'esg-readiness' | 'about' | 'resources' | 'contact' | 'pricing'
+  | 'home' | 'services' | 'industries' | 'carbon-intelligence' | 'esg-readiness' | 'about' | 'resources' | 'contact' | 'faq' | 'pricing'
+  | 'ai' | 'tools' | 'insights' | 'case-studies' | 'trust' | 'frameworks' | 'careers' | 'partners' | 'press' | 'media-kit'
+  | 'mission' | 'vision' | 'methodology' | 'certifications' | 'research' | 'whitepapers' | 'blog'
+  | 'privacy' | 'terms' | 'cookies' | 'service-detail' | 'industry-detail' | 'ai-detail' | 'tool-detail' | 'insight-detail' | 'case-study-detail'
   | 'assessment' | 'login' | 'public-calculator' | 'dashboard-overview' | 'dashboard-company' | 'dashboard-facilities'
   | 'dashboard-energy' | 'dashboard-emissions-scope1' | 'dashboard-emissions-scope2' | 'dashboard-emissions-scope3'
   | 'dashboard-calculator' | 'dashboard-intelligence' | 'dashboard-opportunities' | 'dashboard-scenarios' | 'dashboard-projects'
   | 'dashboard-esg' | 'dashboard-questionnaires' | 'dashboard-documents' | 'dashboard-reports'
-  | 'dashboard-ai-assistant' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform' | 'dashboard-collaboration' | 'dashboard-public-portal' | 'dashboard-marketplace' | 'dashboard-help' | 'dashboard-analytics' | 'dashboard-sustainability';
+  | 'dashboard-ai-assistant' | 'dashboard-admin' | 'dashboard-platform-admin' | 'dashboard-settings' | 'dashboard-metadata' | 'dashboard-data-platform' | 'dashboard-collaboration' | 'dashboard-public-portal' | 'dashboard-marketplace' | 'dashboard-help' | 'dashboard-analytics' | 'dashboard-sustainability';

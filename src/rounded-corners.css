@@ -1,0 +1,125 @@
+:root {
+  --radius-control: 6px;
+  --radius-surface: 8px;
+}
+
+/* Shared controls */
+.bc-button,
+.bc-consult-button,
+.v1-portal-button,
+.v1-primary-button,
+.v1-light-button,
+.ep-button,
+.engine-button,
+.pricing-cta,
+.pricing-comparison-toggle,
+.pricing-filter button,
+.pricing-final-cta a,
+.pricing-final-cta button,
+.v1-auth-submit,
+.v1-service-filters button,
+.v1-service-card > button,
+.v1-faq-sidebar button,
+.v1-contact-form button,
+.btn-primary,
+.btn-secondary,
+.studio-primary,
+.studio-secondary,
+.studio-action,
+.studio-icon-action,
+.studio-mini {
+  border-radius: var(--radius-control);
+}
+
+.engine-field :where(input, select, textarea),
+.v1-contact-form :where(input:not([type="checkbox"]), select, textarea),
+.pricing-roi-fields :where(input, select),
+.v1-service-search,
+.v1-auth-input,
+.v1-auth-mode-switch,
+.v1-auth-mode-switch button,
+.studio-input,
+#client-dashboard-app :where(input, select, textarea) {
+  border-radius: var(--radius-control);
+}
+
+/* Public website surfaces */
+.bc-service-grid,
+.bc-industry-row,
+.bc-steps,
+.bc-scope-card,
+.bc-intelligence-panel,
+.v1-service-tools,
+.v1-service-card,
+.v1-number-card,
+.v1-principle-card,
+.v1-contact-services article,
+.v1-contact-form-wrap,
+.v1-auth-shell,
+.v1-auth-alert,
+.v1-auth-success,
+.ep-card,
+.ep-empty,
+.ep-placeholder-notice,
+.ep-detail-aside,
+.ep-related-grid,
+.ep-resource-grid,
+.ep-framework-cards,
+.ep-trust-grid {
+  border-radius: var(--radius-surface);
+}
+
+.v1-auth-shell {
+  overflow: hidden;
+}
+
+.public-scope-calculator-shell,
+.carbon-engine-summary,
+.carbon-engine-workspace > header,
+.carbon-engine-workspace > div.grid > section,
+.carbon-engine-workspace > div.grid > aside > section,
+.carbon-engine-workspace > section {
+  border-radius: var(--radius-surface);
+}
+
+.carbon-engine-summary {
+  overflow: hidden;
+}
+
+/* Grouped surfaces need their children clipped to the softened outer edge. */
+.bc-service-grid,
+.bc-industry-row,
+.bc-steps,
+.ep-detail-aside,
+.ep-related-grid,
+.ep-resource-grid,
+.ep-framework-cards,
+.ep-trust-grid {
+  overflow: hidden;
+}
+
+/* Pricing surfaces */
+.pricing-hero-control,
+.pricing-plan-card,
+.pricing-usage-grid > article,
+.pricing-table-wrap,
+.pricing-addon-grid article,
+.pricing-services-section,
+.pricing-roi-section,
+.pricing-roi-results,
+.pricing-final-cta,
+.pricing-plan-badge,
+.pricing-savings-badge {
+  border-radius: var(--radius-surface);
+}
+
+/* Existing utility surfaces in the authenticated product. */
+.rounded,
+.rounded-md {
+  border-radius: var(--radius-control) !important;
+}
+
+.rounded-lg,
+.report-canvas {
+  border-radius: var(--radius-surface) !important;
+}

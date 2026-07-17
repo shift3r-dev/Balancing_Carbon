@@ -95,7 +95,7 @@ export const mapReport = (r: any) => ({
   createdDate: r.created_date,
   summary: r.summary ?? '',
   status: r.status ?? 'Generated',
-  downloadUrl: r.download_url ?? '#',
+  downloadUrl: r.download_url ?? '',
 });
 
 export const mapProductionRecord = (r: any) => ({

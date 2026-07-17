@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -15,10 +15,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Bell,
-  ClipboardList,
+  ChevronDown,
   Database,
-  Gauge,
   Target,
   CircleHelp,
   Users,
@@ -29,6 +27,7 @@ import {
 } from "lucide-react";
 import AsymmetricInfinityLogo from "./AsymmetricInfinityLogo.tsx";
 import { ViewState } from "../types.ts";
+import { hasAdminAccess, hasPlatformAdminAccess } from "../utils/adminAccess.ts";
 
 interface SidebarUser {
   id?: string;
@@ -63,6 +62,8 @@ export default function DashboardSidebar({
   const [query, setQuery] = useState("");
   const displayName = user?.name || user?.full_name || "User";
   const displayEmail = user?.email || "";
+  const isAdmin = hasAdminAccess(user?.role);
+  const isPlatformAdmin = hasPlatformAdminAccess(user?.role);
 
   const initials =
     displayName
@@ -74,9 +75,10 @@ export default function DashboardSidebar({
       .slice(0, 2)
       .toUpperCase() || "U";
 
-  const menuItems = [
+  const menuItems = useMemo(() => [
     {
-      label: "Command Center",
+      label: "Home",
+      icon: LayoutDashboard,
       items: [
         { id: "dashboard-overview", label: "Overview", icon: LayoutDashboard },
         { id: "dashboard-company", label: "Organisation", icon: Building2 },
@@ -84,11 +86,11 @@ export default function DashboardSidebar({
       ],
     },
     {
-      label: "Carbon Inventory",
+      label: "Measure",
+      icon: Zap,
       items: [
         { id: "dashboard-calculator", label: "Calculator", icon: BarChart3 },
-        { id: "dashboard-energy", label: "Energy Ledger", icon: Zap },
-        { id: "dashboard-energy", label: "Production", icon: Database },
+        { id: "dashboard-energy", label: "Activity & Production", icon: Zap },
         {
           id: "dashboard-emissions-scope1",
           label: "Scope 1",
@@ -103,43 +105,28 @@ export default function DashboardSidebar({
           id: "dashboard-emissions-scope3",
           label: "Scope 3",
           icon: BarChart3,
-          badge: "Soon",
         },
       ],
     },
     {
-      label: "Intelligence",
+      label: "Improve",
+      icon: Lightbulb,
       items: [
-        { id: "dashboard-help", label: "Help & Learning", icon: CircleHelp },
+        {
+          id: "dashboard-intelligence",
+          label: "Carbon Intelligence",
+          icon: Lightbulb,
+          badge: "4 tools",
+        },
         { id: "dashboard-analytics", label: "Analytics Studio", icon: BarChart3 },
         { id: "dashboard-sustainability", label: "Sustainability Planner", icon: Target },
-        {
-          id: "dashboard-intelligence",
-          label: "Diagnostics",
-          icon: Lightbulb,
-        },
-        {
-          id: "dashboard-intelligence",
-          label: "Hotspots",
-          icon: Gauge,
-        },
-        {
-          id: "dashboard-intelligence",
-          label: "Scenario Modeller",
-          icon: Target,
-        },
-        {
-          id: "dashboard-intelligence",
-          label: "Projects",
-          icon: ClipboardList,
-        },
+        { id: "dashboard-ai-assistant", label: "Carbon AI Assistant", icon: Bot, badge: "AI" },
       ],
     },
     {
-      label: "Reporting & Evidence",
+      label: "Report",
+      icon: FileCheck,
       items: [
-        { id: "dashboard-collaboration", label: "Collaboration", icon: Users },
-        { id: "dashboard-public-portal", label: "Public ESG Portal", icon: Globe2 },
         { id: "dashboard-reports", label: "Reports", icon: BarChart3 },
         { id: "dashboard-documents", label: "Documents", icon: FolderClosed },
         {
@@ -148,26 +135,38 @@ export default function DashboardSidebar({
           icon: FileCheck,
         },
         { id: "dashboard-esg", label: "ESG Readiness", icon: ShieldAlert },
+        { id: "dashboard-collaboration", label: "Collaboration", icon: Users },
+        { id: "dashboard-public-portal", label: "Public ESG Portal", icon: Globe2 },
       ],
     },
     {
-      label: "System",
+      label: "Connect",
+      icon: Database,
       items: [
-        {
-          id: "dashboard-ai-assistant",
-          label: "Carbon AI Assistant",
-          icon: Bot,
-          isHot: true,
-        },
-        { id: "dashboard-metadata", label: "Metadata Studio", icon: Database },
         { id: "dashboard-data-platform", label: "Data Hub", icon: Database },
+        { id: "dashboard-metadata", label: "Metadata Studio", icon: Database },
         { id: "dashboard-marketplace", label: "Marketplace", icon: Store },
-        { id: "dashboard-settings", label: "System Settings", icon: Settings },
-        { id: "dashboard-settings", label: "Audit Logs", icon: ClipboardList, badge: "Soon" },
-        { id: "dashboard-collaboration", label: "Notifications", icon: Bell },
       ],
     },
-  ];
+    {
+      label: "Manage",
+      icon: Settings,
+      items: [
+        ...(isPlatformAdmin ? [{ id: "dashboard-platform-admin", label: "Platform Console", icon: ShieldAlert, badge: "Owner" }] : []),
+        ...(isAdmin ? [{ id: "dashboard-admin", label: "Admin Console", icon: ShieldAlert, badge: "Admin" }] : []),
+        { id: "dashboard-help", label: "Help & Learning", icon: CircleHelp },
+        { id: "dashboard-settings", label: "Settings & Subscription", icon: Settings },
+      ],
+    },
+  ], [isAdmin, isPlatformAdmin]);
+
+  const activeGroup = useMemo(
+    () => menuItems.find((group) => group.items.some((item) => item.id === currentView))?.label ?? "Home",
+    [currentView, menuItems],
+  );
+  const [openGroup, setOpenGroup] = useState(activeGroup);
+
+  useEffect(() => { setOpenGroup(activeGroup); }, [activeGroup]);
 
   const visibleGroups = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -175,7 +174,7 @@ export default function DashboardSidebar({
     return menuItems
       .map((group) => ({ ...group, items: group.items.filter((item) => `${group.label} ${item.label}`.toLowerCase().includes(normalized)) }))
       .filter((group) => group.items.length);
-  }, [query]);
+  }, [menuItems, query]);
 
   const navigate = (view: ViewState) => {
     onViewChange(view);
@@ -235,14 +234,38 @@ export default function DashboardSidebar({
       {!collapsed && <div className="px-3 pt-3"><label className="relative block"><span className="sr-only">Search navigation</span><Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a workspace" className="w-full h-9 pl-9 pr-3 bg-brand-offwhite border border-brand-border rounded text-xs outline-none focus:border-brand-forest" /></label></div>}
 
       {/* Sidebar Navigation Menu */}
-      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-6">
-        {visibleGroups.map((group) => (
+      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+        {visibleGroups.map((group) => {
+          const GroupIcon = group.icon;
+          const groupActive = group.label === activeGroup;
+          const groupOpen = Boolean(query.trim()) || group.label === openGroup;
+          if (collapsed) return (
+            <button
+              key={group.label}
+              type="button"
+              onClick={() => { setCollapsed(false); setOpenGroup(group.label); }}
+              className={`w-full h-11 flex items-center justify-center rounded-lg relative group ${groupActive ? "bg-brand-sage text-brand-forest" : "text-gray-400 hover:bg-brand-sage/20 hover:text-brand-forest"}`}
+              title={group.label}
+              aria-label={`Open ${group.label} workspace`}
+            >
+              <GroupIcon className="w-4 h-4" />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-brand-charcoal text-white text-[10px] rounded opacity-0 pointer-events-none group-hover:opacity-100 z-50 whitespace-nowrap">{group.label}</span>
+            </button>
+          );
+          return (
           <div key={group.label} className="space-y-1">
-            {!collapsed && (
-              <span className="px-3 text-[10px] font-semibold text-gray-400 uppercase tracking-widest block mb-2 font-mono">
-                {group.label}
-              </span>
-            )}
+            <button
+              type="button"
+              onClick={() => setOpenGroup((current) => current === group.label ? "" : group.label)}
+              className={`w-full h-10 px-3 rounded-lg flex items-center gap-3 text-xs font-bold transition ${groupActive ? "text-brand-forest" : "text-gray-500 hover:bg-brand-offwhite hover:text-brand-charcoal"}`}
+              aria-expanded={groupOpen}
+            >
+              <GroupIcon className={`w-4 h-4 shrink-0 ${groupActive ? "text-brand-forest" : "text-gray-400"}`} />
+              <span className="flex-1 text-left">{group.label}</span>
+              {groupActive && <span className="w-1.5 h-1.5 bg-brand-forest rounded-full" aria-label="Current workspace" />}
+              {groupOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+            {groupOpen && <div className="pl-3 space-y-1">
             {group.items.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -261,34 +284,19 @@ export default function DashboardSidebar({
                   <Icon
                     className={`w-4 h-4 shrink-0 ${isActive ? "text-brand-forest" : "text-gray-400 group-hover:text-brand-forest"}`}
                   />
-                  {!collapsed && (
-                    <span className="truncate flex-1 text-left">
-                      {item.label}
-                    </span>
-                  )}
+                  <span className="truncate flex-1 text-left">{item.label}</span>
 
-                  {!collapsed && item.badge && (
+                  {item.badge && (
                     <span className="text-[8px] font-mono font-bold bg-brand-sage text-brand-forest px-1.5 py-0.5 rounded uppercase">
                       {item.badge}
                     </span>
                   )}
-
-                  {!collapsed && item.isHot && (
-                    <span className="text-[8px] font-mono font-bold bg-brand-forest text-white px-1.5 py-0.5 rounded uppercase animate-pulse">
-                      AI Active
-                    </span>
-                  )}
-
-                  {collapsed && (
-                    <div className="absolute left-full ml-2 px-2 py-1 bg-brand-charcoal text-white text-[10px] rounded font-mono shadow-md border border-white/10 opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 z-50 whitespace-nowrap">
-                      {item.label}
-                    </div>
-                  )}
                 </button>
               );
             })}
+            </div>}
           </div>
-        ))}
+        );})}
       </div>
 
       {/* User Info & Logout bottom tray */}

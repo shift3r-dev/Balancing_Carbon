@@ -1,4 +1,5 @@
 import express from 'express';
+import 'express-async-errors';
 import 'dotenv/config';
 import cors from 'cors';
 import path from 'node:path';
@@ -25,20 +26,53 @@ import { createSustainabilityRouter } from './server/routes/sustainabilityRoutes
 import { createCollaborationRouter } from './server/routes/collaborationRoutes.js';
 import { createPublicPortalRouter } from './server/routes/publicPortalRoutes.js';
 import { createMarketplaceRouter } from './server/routes/marketplaceRoutes.js';
+import { createPlatformAdminRouter } from './server/routes/platformAdminRoutes.js';
+import { createCarbonEngineRouter } from './server/routes/carbonEngineRoutes.js';
+import { createContactRouter } from './server/routes/contactRoutes.js';
 import { runtimeConfig } from './server/config/runtime.js';
 import { errorHandler } from './server/middleware/errorHandler.js';
 import { requestLogger } from './server/middleware/requestLogger.js';
+import { platformSecurityHeaders, rateLimit, sanitizeProductionErrors } from './server/middleware/platformSecurity.js';
 
 const app = express();
 
+const normalizeOrigin = (value: string) => value.trim().replace(/\/$/, '');
+const allowedOrigins = new Set(
+  [
+    process.env.APP_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+    ...(process.env.ALLOWED_ORIGINS ?? '').split(','),
+  ]
+    .filter((value): value is string => Boolean(value && !value.includes('MY_APP_URL')))
+    .map(normalizeOrigin),
+);
+const localOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
 app.disable('x-powered-by');
-app.use(cors({ origin: true, credentials: true }));
+app.set('trust proxy', 1);
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) return callback(null, true);
+    const normalized = normalizeOrigin(origin);
+    const allowed = allowedOrigins.has(normalized)
+      || (runtimeConfig.environment !== 'production' && localOrigin.test(normalized));
+    return callback(null, allowed);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-ID'],
+}));
 app.use(requestLogger);
+app.use(platformSecurityHeaders);
+app.use(sanitizeProductionErrors);
 app.use(express.json({ limit: runtimeConfig.requestBodyLimit }));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'Balancing Carbon API' }));
 
-app.use('/api/auth', createAuthRouter());
+app.use('/api/auth', rateLimit({ windowMs: 60_000, limit: 15, namespace: 'auth' }), createAuthRouter());
+app.use('/api/public/contact', rateLimit({ windowMs: 10 * 60_000, limit: 5, namespace: 'contact' }));
+app.use('/api', createContactRouter());
+app.use('/api', rateLimit({ windowMs: 60_000, limit: 600, namespace: 'api' }));
 app.use('/api/organisation', createOrganisationRouter());
 app.use('/api/facilities', createFacilityRouter());
 app.use('/api/energy', createEnergyRouter());
@@ -46,6 +80,7 @@ app.use('/api/emission-factors', createEmissionFactorRouter());
 app.use('/api/production', createProductionRouter());
 app.use('/api', createComplianceRouter());
 app.use('/api', createCarbonAccountingRouter());
+app.use('/api', createCarbonEngineRouter());
 app.use('/api', createReportingRouter());
 app.use('/api', createReportingPlatformRouter());
 app.use('/api', createIntelligenceRouter());
@@ -61,8 +96,12 @@ app.use('/api', createSustainabilityRouter());
 app.use('/api', createCollaborationRouter());
 app.use('/api', createPublicPortalRouter());
 app.use('/api', createMarketplaceRouter());
+app.use('/api', createPlatformAdminRouter());
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.', path: req.originalUrl }));
+
+// Vercel exports the Express application without starting the local server.
+if (process.env.VERCEL) app.use(errorHandler);
 
 async function configureFrontend() {
   if (process.env.NODE_ENV === 'production') {

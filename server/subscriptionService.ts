@@ -1,18 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import { syncLicenseFromSubscription } from './entitlementService.js';
 import { supabaseAdmin } from './supabaseClients.js';
+import { defaultImplementationServices, defaultPricingAddons, defaultPricingPlans } from '../shared/pricingCatalog.js';
 
 const mapPlan = (row: any) => ({
   id: row.id,
   name: row.name,
   slug: row.slug,
   description: row.description,
+  valueProposition: row.value_proposition ?? '',
+  targetAudience: Array.isArray(row.target_audience) ? row.target_audience : [],
   monthlyPrice: Number(row.monthly_price ?? 0),
   yearlyPrice: Number(row.yearly_price ?? 0),
   currency: row.currency,
   trialDays: Number(row.trial_days ?? 0),
   recommended: Boolean(row.recommended),
   badge: row.badge ?? '',
+  ctaLabel: row.cta_label ?? 'Get started',
+  ctaAction: row.cta_action ?? 'register',
+  contactSales: Boolean(row.contact_sales),
+  regionalPrices: row.regional_prices ?? {},
+  promotion: row.promotion ?? {},
+  visible: row.visible !== false,
   active: Boolean(row.active),
   sortOrder: Number(row.sort_order ?? 0),
   features: (row.plan_features ?? []).sort((left: any, right: any) => left.sort_order - right.sort_order).map((feature: any) => ({ key: feature.feature_key, label: feature.label, category: feature.category, availability: feature.availability })),
@@ -23,6 +32,23 @@ export async function getPlans() {
   const { data, error } = await supabaseAdmin.from('plans').select('*, plan_features(*), plan_limits(*)').eq('active', true).is('deleted_at', null).order('sort_order');
   if (error) throw new Error(error.message);
   return (data ?? []).map(mapPlan);
+}
+
+export async function getPricingCatalog() {
+  const [plansResult, addonsResult, servicesResult] = await Promise.all([
+    supabaseAdmin.from('plans').select('*, plan_features(*), plan_limits(*)').eq('active', true).eq('visible', true).is('deleted_at', null).order('sort_order'),
+    supabaseAdmin.from('pricing_addons').select('*').eq('visible', true).is('deleted_at', null).order('sort_order'),
+    supabaseAdmin.from('implementation_services').select('*').eq('visible', true).is('deleted_at', null).order('sort_order'),
+  ]);
+  if (plansResult.error || addonsResult.error || servicesResult.error || !(plansResult.data ?? []).some((plan: any) => plan.id === 'plan-free')) {
+    return { plans: defaultPricingPlans, addons: defaultPricingAddons, implementationServices: defaultImplementationServices, source: 'default-configuration' };
+  }
+  return {
+    plans: (plansResult.data ?? []).map(mapPlan),
+    addons: (addonsResult.data ?? []).map((row: any) => ({ id: row.id, key: row.addon_key, name: row.name, description: row.description, benefit: row.benefit, pricingLabel: row.pricing_label, category: row.category, visible: row.visible, sortOrder: row.sort_order })),
+    implementationServices: (servicesResult.data ?? []).map((row: any) => ({ id: row.id, key: row.service_key, name: row.name, description: row.description, pricingLabel: row.pricing_label, visible: row.visible, sortOrder: row.sort_order })),
+    source: 'database',
+  };
 }
 
 export async function getSubscription(organisationId: string) {

@@ -24,12 +24,13 @@ export type ReportSnapshot = {
   emissionsTco2e: number;
   scope1Tco2e: number;
   scope2Tco2e: number;
+  scope3Tco2e: number;
   approvedActivityCount: number;
   activityEvidenceCount: number;
   facilities: Array<{ id: string; name: string; emissionsTco2e: number }>;
   sources: Array<{ name: string; emissionsTco2e: number }>;
   calculationReferences: Array<{ id: string; activityId: string; factorVersion: string; calculatedAt: string }>;
-  display?: { total: { value: number; unit: string }; scope1: { value: number; unit: string }; scope2: { value: number; unit: string } };
+  display?: { total: { value: number; unit: string }; scope1: { value: number; unit: string }; scope2: { value: number; unit: string }; scope3: { value: number; unit: string } };
 };
 
 export type ReportValidation = {
@@ -47,6 +48,7 @@ export function buildReportSnapshot(calculations: ReportingCalculation[], genera
   const sources = new Map<string, number>();
   let scope1Tco2e = 0;
   let scope2Tco2e = 0;
+  let scope3Tco2e = 0;
   let activityEvidenceCount = 0;
   let approvedActivityCount = 0;
 
@@ -57,6 +59,7 @@ export function buildReportSnapshot(calculations: ReportingCalculation[], genera
     activityIds.add(activity.id);
     if (activity.scope === 'scope-1') scope1Tco2e += safeEmissions;
     if (activity.scope === 'scope-2') scope2Tco2e += safeEmissions;
+    if (activity.scope === 'scope-3') scope3Tco2e += safeEmissions;
     if ((activity.evidence_count ?? 0) > 0) activityEvidenceCount += 1;
     if (['verified', 'approved'].includes(activity.verification_status ?? '')) approvedActivityCount += 1;
 
@@ -72,9 +75,10 @@ export function buildReportSnapshot(calculations: ReportingCalculation[], genera
     generatedAt,
     calculationCount: calculations.length,
     activityCount: activityIds.size,
-    emissionsTco2e: round(scope1Tco2e + scope2Tco2e),
+    emissionsTco2e: round(scope1Tco2e + scope2Tco2e + scope3Tco2e),
     scope1Tco2e: round(scope1Tco2e),
     scope2Tco2e: round(scope2Tco2e),
+    scope3Tco2e: round(scope3Tco2e),
     approvedActivityCount,
     activityEvidenceCount,
     facilities: [...facilities.values()].map((item) => ({ ...item, emissionsTco2e: round(item.emissionsTco2e) })).sort((a, b) => b.emissionsTco2e - a.emissionsTco2e),
@@ -89,7 +93,7 @@ export function validateReportSnapshot(snapshot: ReportSnapshot): ReportValidati
   if (!snapshot.calculationCount) errors.push('No current carbon calculations are available for this reporting period.');
   if (snapshot.activityCount && snapshot.activityEvidenceCount < snapshot.activityCount) warnings.push(`${snapshot.activityCount - snapshot.activityEvidenceCount} activity record(s) do not have linked evidence.`);
   if (snapshot.activityCount && snapshot.approvedActivityCount < snapshot.activityCount) warnings.push(`${snapshot.activityCount - snapshot.approvedActivityCount} activity record(s) still need verification or approval.`);
-  if (!snapshot.scope1Tco2e && !snapshot.scope2Tco2e && snapshot.calculationCount) warnings.push('Current calculations contain zero Scope 1 and Scope 2 emissions; confirm the activity data and factors.');
+  if (!snapshot.scope1Tco2e && !snapshot.scope2Tco2e && !snapshot.scope3Tco2e && snapshot.calculationCount) warnings.push('Current calculations contain zero reported emissions; confirm the activity data and factors.');
   const activityEvidenceCoverage = snapshot.activityCount ? round((snapshot.activityEvidenceCount / snapshot.activityCount) * 100) : 0;
   const approvedActivityCoverage = snapshot.activityCount ? round((snapshot.approvedActivityCount / snapshot.activityCount) * 100) : 0;
   return { status: errors.length ? 'blocked' : warnings.length ? 'needs-review' : 'ready', errors, warnings, metrics: { activityEvidenceCoverage, approvedActivityCoverage, calculationCoverage: snapshot.calculationCount ? 100 : 0 } };
@@ -109,6 +113,7 @@ export function reportRows(report: any) {
     rows.push(['Carbon inventory', 'Total emissions', snapshot.display ? `${snapshot.display.total.value} ${snapshot.display.total.unit}` : `${snapshot.emissionsTco2e.toFixed(3)} tCO2e`]);
     rows.push(['Carbon inventory', 'Scope 1', snapshot.display ? `${snapshot.display.scope1.value} ${snapshot.display.scope1.unit}` : `${snapshot.scope1Tco2e.toFixed(3)} tCO2e`]);
     rows.push(['Carbon inventory', 'Scope 2', snapshot.display ? `${snapshot.display.scope2.value} ${snapshot.display.scope2.unit}` : `${snapshot.scope2Tco2e.toFixed(3)} tCO2e`]);
+    rows.push(['Carbon inventory', 'Scope 3', snapshot.display ? `${snapshot.display.scope3.value} ${snapshot.display.scope3.unit}` : `${snapshot.scope3Tco2e.toFixed(3)} tCO2e`]);
     rows.push(['Data quality', 'Evidence coverage', `${snapshot.activityCount ? ((snapshot.activityEvidenceCount / snapshot.activityCount) * 100).toFixed(1) : '0.0'}%`]);
     rows.push(['Data quality', 'Approved activity coverage', `${snapshot.activityCount ? ((snapshot.approvedActivityCount / snapshot.activityCount) * 100).toFixed(1) : '0.0'}%`]);
     for (const source of snapshot.sources) rows.push(['Emission source', source.name, `${source.emissionsTco2e.toFixed(3)} tCO2e`]);

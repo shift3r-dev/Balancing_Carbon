@@ -1,45 +1,6 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-      // Safe guard against libraries attempting to overwrite global fetch
-      (function () {
-        let currentFetch = window.fetch;
-
-        try {
-          Object.defineProperty(window, "fetch", {
-            get() {
-              return currentFetch;
-            },
-            set(val) {
-              currentFetch = val;
-            },
-            configurable: true,
-            enumerable: true,
-          });
-        } catch (e) {
-          console.warn("Could not define fetch setter on window:", e);
-        }
-
-        let currentGlobalFetch = globalThis.fetch;
-
-        try {
-          Object.defineProperty(globalThis, "fetch", {
-            get() {
-              return currentGlobalFetch;
-            },
-            set(val) {
-              currentGlobalFetch = val;
-            },
-            configurable: true,
-            enumerable: true,
-          });
-        } catch (e) {
-          console.warn("Could not define fetch setter on globalThis:", e);
-        }
-      })();
-    </script>
-
     <!-- Basic -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -59,6 +20,8 @@
 
     <meta name="author" content="Balancing Carbon" />
     <meta name="theme-color" content="#2E6B3D" />
+    <link rel="canonical" href="https://balancingcarbon.com/" />
+    <link rel="preload" href="/home-hero.webp" as="image" type="image/webp" />
 
     <!-- Open Graph -->
     <meta property="og:title" content="Balancing Carbon" />
@@ -67,6 +30,9 @@
       content="Industrial Carbon Intelligence Platform"
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://balancingcarbon.com/" />
+    <meta property="og:image" content="https://balancingcarbon.com/home-hero.webp" />
+    <meta name="twitter:card" content="summary_large_image" />
 
     <!-- Favicons -->
     <link rel="icon" href="/favicon.ico" sizes="any" />

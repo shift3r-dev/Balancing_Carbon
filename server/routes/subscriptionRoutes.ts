@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { type AuthenticatedRequest, requireAuth, requirePermission } from '../auth.js';
-import { changeSubscription, getPlans, getSubscription, subscriptionUsage } from '../subscriptionService.js';
+import { changeSubscription, getPlans, getPricingCatalog, getSubscription, subscriptionUsage } from '../subscriptionService.js';
 
 export function createSubscriptionRouter() {
   const router = Router();
   router.get('/plans', async (_req, res) => { try { res.json({ plans: await getPlans() }); } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load plans.' }); } });
+  router.get('/pricing-catalog', async (_req, res) => { try { res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600'); res.json(await getPricingCatalog()); } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load pricing catalog.' }); } });
   router.get('/subscription', requireAuth, async (req: AuthenticatedRequest, res) => { try { res.json({ subscription: await getSubscription(req.authorization!.organisationId) }); } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load subscription.' }); } });
   router.get('/subscription/usage', requireAuth, async (req: AuthenticatedRequest, res) => { try { res.json({ usage: await subscriptionUsage(req.authorization!.organisationId) }); } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load usage.' }); } });
   router.get('/subscription/features', requireAuth, async (req: AuthenticatedRequest, res) => { try { const subscription = await getSubscription(req.authorization!.organisationId); res.json({ features: subscription?.plan?.features ?? [], limits: subscription?.plan?.limits ?? [] }); } catch (e) { res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to load plan details.' }); } });

@@ -47,9 +47,9 @@ export default function AsymmetricInfinityLogo({
       {/* Logo Mark Container with Fallback */}
       <div className="flex items-center shrink-0">
         <img
-          src="/Balancing.png"
-          alt="Balancing Carbon Logo Mark"
-          className={`${heightClasses[size]} w-auto object-contain`}
+          src="/android-chrome-192x192.png"
+          alt="Balancing Carbon infinity mark"
+          className={`${heightClasses[size]} aspect-square rounded-sm object-contain`}
           referrerPolicy="no-referrer"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
@@ -97,7 +97,7 @@ export default function AsymmetricInfinityLogo({
         </div>
       </div>
 
-      {/* Typography text rendered next to the logo mark */}
+      {/* Typography lockup keeps the supplied square mark legible at every size. */}
       {!hideText && (
         <div className="flex flex-col text-left justify-center">
           <span className={`font-sans font-extrabold uppercase leading-none ${textColor} ${mainFontClass}`}>

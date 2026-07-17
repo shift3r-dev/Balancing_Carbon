@@ -1,24 +1,12 @@
-export interface CopilotGenerationInput {
-  system: string;
-  question: string;
-  history: Array<{ role: 'user' | 'assistant'; content: string }>;
-  context: unknown;
-  signal?: AbortSignal;
-}
+import {
+  cleanStringList,
+  copilotResponseSchema,
+  type CarbonCopilotProvider,
+  type CopilotGenerationInput,
+  type CopilotGenerationResult,
+} from './aiProvider.js';
 
-export interface CopilotGenerationResult {
-  answer: string;
-  citationIds: string[];
-  suggestedActions: string[];
-  limitations: string[];
-  promptTokens?: number;
-  completionTokens?: number;
-  durationMs: number;
-}
-
-const cleanList = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string').slice(0, 8) : [];
-
-export class OllamaProvider {
+export class OllamaProvider implements CarbonCopilotProvider {
   constructor(
     private readonly baseUrl: string,
     readonly model: string,
@@ -46,14 +34,7 @@ export class OllamaProvider {
         method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: this.model, stream: false, think: false, keep_alive: '10m',
-          format: {
-            type: 'object', additionalProperties: false,
-            properties: {
-              answer: { type: 'string' }, citationIds: { type: 'array', items: { type: 'string' } },
-              suggestedActions: { type: 'array', items: { type: 'string' } }, limitations: { type: 'array', items: { type: 'string' } },
-            },
-            required: ['answer', 'citationIds', 'suggestedActions', 'limitations'],
-          },
+          format: copilotResponseSchema,
           messages: [
             { role: 'system', content: input.system },
             ...input.history.slice(-8),
@@ -68,8 +49,8 @@ export class OllamaProvider {
       let parsed: any;
       try { parsed = JSON.parse(raw); } catch { parsed = { answer: raw }; }
       return {
-        answer: String(parsed.answer ?? raw), citationIds: cleanList(parsed.citationIds),
-        suggestedActions: cleanList(parsed.suggestedActions), limitations: cleanList(parsed.limitations),
+        answer: String(parsed.answer ?? raw), citationIds: cleanStringList(parsed.citationIds),
+        suggestedActions: cleanStringList(parsed.suggestedActions), limitations: cleanStringList(parsed.limitations),
         promptTokens: Number(payload.prompt_eval_count) || undefined, completionTokens: Number(payload.eval_count) || undefined,
         durationMs: Date.now() - started,
       };

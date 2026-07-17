@@ -255,6 +255,8 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `server/dataIngestion.test.ts` | Phase 7 parser and quality-engine tests | Data ingestion service | `npm run test:data` | Active | Medium | Keep |
 | `server/operationalPostingService.ts` | Governed posting from approved staging records into operational ledgers with carbon lineage | Supabase, measurement and ledger services | Data Platform router | Active | Very high | Keep; move multi-table posting into database transactions/RPCs |
 | `server/ai/ollamaProvider.ts` | Local Ollama health and structured generation adapter | Ollama HTTP API | AI Copilot router | Active | Medium | Keep provider-isolated for future deployment choices |
+| `server/ai/geminiProvider.ts` | Hosted Gemini health, structured generation, cancellation, and token-usage adapter | Google Gemini REST API | AI provider factory | Active | Medium | Keep credentials server-side and monitor model lifecycle |
+| `server/ai/providerFactory.ts` | Validates provider policy and creates the configured Gemini or Ollama adapter | Runtime configuration, provider adapters | AI-enabled routes | Active | Low | Keep as the single provider-selection boundary |
 | `server/ai/carbonCopilotContext.ts` | Read-only, bounded tenant context, evidence retrieval, and citation catalog | Supabase, document retrieval | AI Copilot router | Active | High | Keep retrieval limits conservative and tenant-scoped |
 | `server/documentExtraction.ts` | Evidence signature validation, PDF/DOCX/text extraction, bounded chunking, and lexical retrieval | pdf-parse, Mammoth | Reporting and Copilot context services | Active | High | Keep; add isolated OCR worker for scanned evidence later |
 | `server/documentExtraction.test.ts` | Evidence validation, chunking, and retrieval tests | Document extraction service | `npm run test:documents` | Active | Low | Keep |
@@ -267,6 +269,7 @@ Columns: **Depends on** / **Used by** / **Status** / **Complexity** / **Recommen
 | `server/reportStudioEngine.ts` | Deterministic report numbering, cross references, and PDF/DOCX/PPTX/XLSX composition | PDFKit, docx, PptxGenJS, ExcelJS | Reporting platform router | Active | High | Keep export-format concerns isolated |
 | `server/reportStudioEngine.test.ts` | Numbering, cross-reference, and output package signature tests | Report Studio engine | `npm run test:studio` | Active | Low | Keep and add visual export fixtures |
 | `server/ai/ollamaProvider.test.ts` | Ollama adapter health and structured-response tests | Provider | `npm run test:ai` | Active | Low | Keep |
+| `server/ai/geminiProvider.test.ts` | Gemini request, schema, usage, error, and cancellation tests | Provider | `npm run test:ai` | Active | Low | Keep |
 | `server/subscriptionService.ts` | Plans/subscription lifecycle | Supabase/entitlements | Subscription router | Active | Medium | Keep |
 | `server/supabase.ts` | Legacy optional Supabase client | dotenv | No runtime imports | Deprecated | Low | Remove or consolidate into clients |
 | `server/supabaseClients.ts` | Required admin/auth Supabase clients | Environment | Auth/services/routers | Active | Low | Keep |

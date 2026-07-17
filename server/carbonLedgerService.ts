@@ -42,19 +42,25 @@ export async function resolveRegistryFactor(sourceType: string, country = 'India
 }
 
 export async function saveCalculationLineage(input: {
-  organisationId: string; userId: string; legacyEnergyRecordId: string; facilityId: string; sourceType: string;
+  organisationId: string; userId: string; legacyEnergyRecordId?: string | null; facilityId: string; sourceType: string;
   activityDate: string; reportingPeriod: string; quantity: number; unit: string; supplier?: string; invoiceNumber?: string;
   cost?: number | null; currency?: string; sourceDocument?: string; notes?: string; factor: EmissionFactor;
   calculation: ReturnType<typeof calculateActivityEmissions>; documentIds?: string[]; supersedesActivityId?: string | null;
   versionNumber?: number;
   inputQuantity?: number; inputUnit?: string; canonicalQuantity?: number; canonicalUnit?: string; conversionFactor?: number; conversionPath?: string[];
+  activityCategory?: string; scopeCategory?: string; ghgCategory?: string; calculationMethod?: string;
+  activityMetadata?: Record<string, unknown>; confidenceScore?: number; dataQualityScore?: number;
+  supplierId?: string | null; assetId?: string | null; meterId?: string | null; formula?: string;
 }) {
   const activityId = `activity-${randomUUID()}`;
   const evidenceIds = [...new Set((input.documentIds ?? []).filter(Boolean))];
   const verificationStatus = evidenceIds.length || input.sourceDocument ? 'submitted' : 'draft';
   const { data: activity, error: activityError } = await supabaseAdmin.from('activity_records').insert({
-    id: activityId, legacy_energy_record_id: input.legacyEnergyRecordId, organisation_id: input.organisationId, facility_id: input.facilityId,
-    activity_category: activityCategory(input.sourceType), source_type: input.sourceType, scope: input.factor.scope,
+    id: activityId, legacy_energy_record_id: input.legacyEnergyRecordId ?? null, organisation_id: input.organisationId, facility_id: input.facilityId,
+    activity_category: input.activityCategory ?? activityCategory(input.sourceType), source_type: input.sourceType, scope: input.factor.scope,
+    scope_category: input.scopeCategory ?? '', ghg_category: input.ghgCategory ?? '', calculation_method: input.calculationMethod ?? 'activity-factor',
+    activity_metadata: input.activityMetadata ?? {}, confidence_score: input.confidenceScore ?? null, data_quality_score: input.dataQualityScore ?? null,
+    supplier_id: input.supplierId ?? null, asset_id: input.assetId ?? null, meter_id: input.meterId ?? null,
     activity_date: input.activityDate, reporting_period: input.reportingPeriod, quantity: input.quantity, unit: input.calculation.normalizedUnit,
     input_quantity: input.inputQuantity ?? input.quantity, input_unit: input.inputUnit ?? input.unit,
     canonical_quantity: input.canonicalQuantity ?? input.quantity, canonical_unit: input.canonicalUnit ?? input.calculation.normalizedUnit,
@@ -75,8 +81,8 @@ export async function saveCalculationLineage(input: {
   const evidenceSnapshot: Array<Record<string, string>> = evidenceIds.map((id) => ({ documentId: id }));
   if (input.sourceDocument) evidenceSnapshot.push({ sourceDocument: input.sourceDocument });
   const { data: calculationRecord, error: calculationError } = await supabaseAdmin.from('calculation_records').insert({
-    id: `calc-${randomUUID()}`, legacy_energy_record_id: input.legacyEnergyRecordId, activity_record_id: activityId, organisation_id: input.organisationId,
-    emission_factor_id: input.factor.id, factor_version: input.factor.version, formula: 'activity quantity x emission factor',
+    id: `calc-${randomUUID()}`, legacy_energy_record_id: input.legacyEnergyRecordId ?? null, activity_record_id: activityId, organisation_id: input.organisationId,
+    emission_factor_id: input.factor.id, factor_version: input.factor.version, formula: input.formula ?? 'activity quantity x emission factor',
     input_snapshot: { quantity: input.quantity, unit: input.calculation.normalizedUnit, sourceType: input.sourceType, activityDate: input.activityDate, inputQuantity: input.inputQuantity ?? input.quantity, inputUnit: input.inputUnit ?? input.unit, canonicalQuantity: input.canonicalQuantity ?? input.quantity, canonicalUnit: input.canonicalUnit ?? input.calculation.normalizedUnit, conversionPath: input.conversionPath ?? [] },
     evidence_snapshot: evidenceSnapshot,
     emissions_kg_co2e: input.calculation.emissionsKgCO2e, emissions_t_co2e: input.calculation.emissionsTCO2e, calculated_by: input.userId,

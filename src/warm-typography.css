@@ -1,0 +1,397 @@
+:root {
+  --type-heading: #4a3428;
+  --type-body: #5b4335;
+  --type-secondary: #7a6556;
+  --type-muted: #9a887b;
+  --type-muted-aa: #7f6b5f;
+  --type-disabled: #b7a79a;
+}
+
+body {
+  color: var(--type-body);
+}
+
+:where(h1, h2, h3, h4, h5, h6) {
+  color: var(--type-heading);
+}
+
+:where(p, li, label, th, td, summary, legend) {
+  color: var(--type-body);
+}
+
+:where(small, figcaption, caption) {
+  color: var(--type-secondary);
+}
+
+input,
+select,
+textarea {
+  color: var(--type-body);
+}
+
+input {
+  -webkit-text-fill-color: var(--type-body);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--type-muted-aa);
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  color: var(--type-disabled);
+}
+
+input:disabled {
+  -webkit-text-fill-color: var(--type-disabled);
+}
+
+/* Existing utility hierarchy */
+:where(#public-website, #client-dashboard-app) :where(.text-brand-charcoal, .text-gray-950, .text-gray-900, .text-gray-800, .text-slate-950, .text-slate-900, .text-slate-800) {
+  color: var(--type-heading) !important;
+}
+
+:where(#public-website, #client-dashboard-app) :where(.text-gray-700, .text-gray-600, .text-slate-700, .text-slate-600) {
+  color: var(--type-body) !important;
+}
+
+:where(#public-website, #client-dashboard-app) :where(.text-gray-500, .text-slate-500) {
+  color: var(--type-secondary) !important;
+}
+
+:where(#public-website, #client-dashboard-app) :where(.text-gray-400, .text-slate-400) {
+  color: var(--type-muted-aa) !important;
+}
+
+:where(#public-website, #client-dashboard-app) :where(.text-gray-300, .text-slate-300) {
+  color: var(--type-disabled) !important;
+}
+
+/* Public navigation on light surfaces */
+#public-website .bc-public-nav-link,
+#public-website .bc-consult-button,
+#public-website .v1-portal-button,
+#public-website .bc-mobile-menu > button,
+#public-website .bc-mobile-menu .text-brand-charcoal {
+  color: var(--type-body) !important;
+}
+
+#public-website .v1-public-logo > div > span:first-child {
+  color: var(--type-heading) !important;
+}
+
+#public-website .bc-public-nav-link:is(:hover, .is-active) {
+  color: var(--color-brand-forest) !important;
+}
+
+/* Marketing home light sections */
+.bc-hero h1 {
+  color: var(--type-heading);
+}
+
+.bc-hero-copy > p,
+.bc-hero-proof span {
+  color: var(--type-body);
+}
+
+.bc-hero-insights > div {
+  color: var(--type-heading) !important;
+}
+
+.bc-hero-insights small {
+  color: var(--type-secondary) !important;
+}
+
+.bc-section-heading h2,
+.bc-industries h2,
+.bc-process h2,
+.bc-scopes h2,
+.bc-faq h2,
+.bc-service-card h3,
+.bc-scope-card h3,
+.bc-steps h3,
+.bc-questions summary,
+.bc-intelligence-panel :where(h2, h3, strong) {
+  color: var(--type-heading) !important;
+}
+
+.bc-section-heading > p,
+.bc-heading-wide > p,
+.bc-service-card p,
+.bc-scope-card p,
+.bc-steps p,
+.bc-questions p,
+.bc-intelligence-panel p {
+  color: var(--type-body) !important;
+}
+
+.bc-service-card li,
+.bc-scope-card li,
+.bc-industry-row button,
+.bc-intelligence-panel :where(.bc-panel-head span, .bc-score-row span),
+.bc-panel-foot {
+  color: var(--type-secondary) !important;
+}
+
+.bc-intelligence-panel :where(.bc-panel-head span, .bc-score-row span, .bc-progress-list span),
+.bc-industry-row button > span,
+.bc-scope-card small {
+  color: var(--type-secondary) !important;
+}
+
+.bc-questions p {
+  color: var(--type-body) !important;
+}
+
+/* Public content pages, excluding their preserved dark bands */
+.v1-public-page > :not(.v1-dark-section):not(.v1-services-hero):not(.v1-page-banner):not(.v1-page-cta) :where(h1, h2, h3, h4),
+.v1-contact-form-wrap :where(h1, h2, h3, h4),
+.v1-faq-sidebar h3 {
+  color: var(--type-heading);
+}
+
+.v1-public-page > :not(.v1-dark-section):not(.v1-services-hero):not(.v1-page-banner):not(.v1-page-cta) :where(p, li, label, summary),
+.v1-contact-form-wrap :where(p, label),
+.v1-faq-sidebar p {
+  color: var(--type-body);
+}
+
+.v1-leading-copy {
+  color: var(--type-body) !important;
+}
+
+.v1-about-visual span {
+  color: var(--type-secondary) !important;
+}
+
+.v1-public-page > :not(.v1-dark-section):not(.v1-services-hero):not(.v1-page-banner):not(.v1-page-cta) :where(small, figcaption),
+.v1-contact-form-wrap :where(small, .v1-form-help) {
+  color: var(--type-secondary);
+}
+
+/* Enterprise content pages, preserving dark heroes and conversion bands */
+.ep-page > :not(.ep-hero):not(.ep-conversion) :where(h1, h2, h3, h4),
+.ep-detail-page .ep-prose :where(h1, h2, h3, h4),
+.ep-detail-aside h3 {
+  color: var(--type-heading);
+}
+
+.ep-page > :not(.ep-hero):not(.ep-conversion) :where(p, li, summary),
+.ep-detail-page .ep-prose :where(p, li, summary),
+.ep-detail-aside p,
+.ep-card :where(p, li),
+.ep-resource-grid p,
+.ep-framework-cards p,
+.ep-trust-grid p,
+.ep-company-sections p,
+.ep-legal article p {
+  color: var(--type-body);
+}
+
+.ep-page > :not(.ep-hero):not(.ep-conversion) :where(small, figcaption),
+.ep-detail-aside > div > span,
+.ep-resource-grid > button > span {
+  color: var(--type-secondary);
+}
+
+/* Pricing light surfaces */
+.pricing-page > :not(.pricing-hero):not(.pricing-usage-section):not(.pricing-services-section):not(.pricing-final-cta) :where(h1, h2, h3, h4),
+.pricing-plan-card :where(h1, h2, h3, h4),
+.pricing-table-wrap th,
+.pricing-addon-grid h3,
+.pricing-roi-inputs h2,
+.pricing-faq-item button {
+  color: var(--type-heading);
+}
+
+.pricing-page > :not(.pricing-hero):not(.pricing-usage-section):not(.pricing-services-section):not(.pricing-final-cta) :where(p, li, label),
+.pricing-plan-card :where(p, li),
+.pricing-table-wrap td,
+.pricing-addon-grid p,
+.pricing-roi-inputs p,
+.pricing-faq-item p {
+  color: var(--type-body);
+}
+
+.pricing-price > span,
+.pricing-audience span,
+.pricing-addon-grid em,
+.pricing-table-wrap small {
+  color: var(--type-secondary);
+}
+
+.pricing-price strong {
+  color: var(--type-heading) !important;
+}
+
+.pricing-filter button:not(.active),
+.pricing-addon-grid article > strong {
+  color: var(--type-body) !important;
+}
+
+.pricing-availability-empty {
+  color: var(--type-disabled) !important;
+}
+
+.pricing-hero h1,
+.pricing-hero-control > p,
+.pricing-usage-grid h3,
+.pricing-services-intro h2,
+.pricing-final-cta h2 {
+  color: inherit;
+}
+
+/* Preserve inherited light typography on existing dark surfaces */
+.v1-services-hero :where(h1, h2, h3, h4),
+.v1-dark-section :where(h1, h2, h3, h4),
+.v1-page-cta :where(h1, h2, h3, h4),
+.ep-hero :where(h1, h2, h3, h4),
+.ep-detail-hero :where(h1, h2, h3, h4),
+.ep-conversion :where(h1, h2, h3, h4),
+.v1-auth-story :where(h1, h2, h3, h4),
+.v1-footer :where(h1, h2, h3, h4, h5, h6, p, li, label, small) {
+  color: inherit;
+}
+
+/* Public calculator */
+.public-scope-calculator-intro h1,
+.carbon-engine-workspace :where(h1, h2, h3, h4),
+.carbon-engine-workspace th {
+  color: var(--type-heading);
+}
+
+.public-scope-calculator-intro > p,
+.carbon-engine-workspace :where(p, li, label, td) {
+  color: var(--type-body);
+}
+
+.public-scope-calculator-note,
+.carbon-engine-workspace :where(small, .engine-field > span) {
+  color: var(--type-secondary);
+}
+
+.carbon-engine-workspace :where(input, select, textarea) {
+  color: var(--type-body) !important;
+}
+
+.carbon-engine-workspace :where(input, select, textarea):disabled {
+  color: var(--type-disabled) !important;
+}
+
+.carbon-engine-workspace :where(input, textarea)::placeholder,
+.carbon-engine-workspace .engine-field small {
+  color: var(--type-muted-aa) !important;
+}
+
+.carbon-engine-workspace .carbon-engine-dark-surface :where(h1, h2, h3, h4, strong) {
+  color: #fff !important;
+}
+
+.carbon-engine-workspace .carbon-engine-dark-surface :where(p, small) {
+  color: #d1d5db !important;
+}
+
+.carbon-engine-workspace .carbon-engine-dark-surface :where(.text-gray-300, .text-gray-400) {
+  color: #cbd5e1 !important;
+}
+
+/* Authentication light panel only */
+.v1-auth-panel-wrap :where(h1, h2, h3, h4),
+.v1-auth-panel-wrap label {
+  color: var(--type-heading);
+}
+
+.v1-auth-panel-wrap :where(p, .v1-auth-back) {
+  color: var(--type-body);
+}
+
+.v1-auth-panel-wrap :where(.v1-auth-field-help, .v1-auth-switch) {
+  color: var(--type-secondary);
+}
+
+.v1-auth-panel-wrap :where(h1, h2, h3, h4),
+.v1-auth-panel-wrap label {
+  color: var(--type-heading) !important;
+}
+
+.v1-auth-panel-wrap :where(p, .v1-auth-back) {
+  color: var(--type-body) !important;
+}
+
+.v1-auth-panel-wrap :where(.v1-auth-field-help, .v1-auth-switch, .v1-auth-mode-switch button:not([aria-selected="true"])) {
+  color: var(--type-secondary) !important;
+}
+
+.v1-auth-panel-wrap input {
+  color: var(--type-body) !important;
+  -webkit-text-fill-color: var(--type-body) !important;
+}
+
+.v1-auth-panel-wrap input:-webkit-autofill,
+.v1-auth-panel-wrap input:-webkit-autofill:hover,
+.v1-auth-panel-wrap input:-webkit-autofill:focus {
+  color: var(--type-body) !important;
+  -webkit-text-fill-color: var(--type-body) !important;
+}
+
+.v1-auth-panel-wrap input::placeholder {
+  color: var(--type-muted-aa) !important;
+}
+
+/* Dashboard light workspace */
+#client-dashboard-app .dashboard-sidebar :where(h1, h2, h3, strong),
+#client-dashboard-app .dashboard-topbar :where(h1, h2, h3, strong),
+#client-dashboard-app main .bg-white :where(h1, h2, h3, h4, h5, h6, strong),
+#client-dashboard-app main .report-canvas :where(h1, h2, h3, h4, h5, h6),
+#client-dashboard-app main table th {
+  color: var(--type-heading);
+}
+
+#client-dashboard-app .dashboard-sidebar :where(p, span),
+#client-dashboard-app .dashboard-topbar :where(p, span),
+#client-dashboard-app main .bg-white :where(p, li, label, td),
+#client-dashboard-app main .report-canvas :where(p, li, label, td),
+#client-dashboard-app main table td {
+  color: var(--type-body);
+}
+
+#client-dashboard-app main .bg-white :where(small, figcaption),
+#client-dashboard-app main .report-canvas :where(small, figcaption),
+#client-dashboard-app main table caption {
+  color: var(--type-secondary);
+}
+
+#client-dashboard-app .dashboard-sidebar :where(button, a):not(.bg-brand-forest):not(.text-brand-forest),
+#client-dashboard-app .dashboard-topbar :where(button, a):not(.bg-brand-forest):not(.text-brand-forest) {
+  color: var(--type-body);
+}
+
+#client-dashboard-app :where(input, select, textarea) {
+  color: var(--type-body) !important;
+}
+
+#client-dashboard-app input {
+  -webkit-text-fill-color: var(--type-body) !important;
+}
+
+#client-dashboard-app :where(input, select, textarea):disabled {
+  color: var(--type-disabled) !important;
+}
+
+#client-dashboard-app input:disabled {
+  -webkit-text-fill-color: var(--type-disabled) !important;
+}
+
+#client-dashboard-app :where(input, textarea)::placeholder {
+  color: var(--type-muted-aa) !important;
+}
+
+#client-dashboard-app main table :where(th, td) {
+  color: var(--type-body) !important;
+}
+
+#client-dashboard-app main table th {
+  color: var(--type-heading) !important;
+}

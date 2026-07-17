@@ -28,13 +28,13 @@ async function buildSnapshot(org:string,portal:any,assets:any[]){
   supabaseAdmin.from('supplier_sustainability_assessments').select('engagement_status,data_quality').eq('organisation_id',org)
  ]);
  const error=organization.error??calculations.error??esg.error??targets.error??pathways.error??suppliers.error;if(error)throw new Error(error.message);
- const calc=calculations.data??[],total=calc.reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),scope1=calc.filter((row:any)=>row.activity_records?.scope==='scope-1').reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),scope2=calc.filter((row:any)=>row.activity_records?.scope==='scope-2').reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),verified=calc.filter((row:any)=>row.activity_records?.verification_status==='verified').length;
+ const calc=calculations.data??[],total=calc.reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),scope1=calc.filter((row:any)=>row.activity_records?.scope==='scope-1').reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),scope2=calc.filter((row:any)=>row.activity_records?.scope==='scope-2').reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),scope3=calc.filter((row:any)=>row.activity_records?.scope==='scope-3').reduce((sum,row)=>sum+n(row.emissions_t_co2e),0),verified=calc.filter((row:any)=>['verified','approved'].includes(row.activity_records?.verification_status)).length;
  const approved=esg.data??[],score=approved.length?Math.round(approved.reduce((sum,row)=>sum+n(row.score),0)/approved.length):null,compliant=approved.filter(row=>row.status==='Compliant').length;
  const content=portal.content??{};
  return{
   schemaVersion:'public-esg-portal-v1',generatedAt:new Date().toISOString(),organization:organization.data,
   portal:{title:portal.title,summary:portal.summary,slug:portal.slug,sections:portal.enabled_sections,theme:portal.theme},
-  carbon:{totalTco2e:total,scope1Tco2e:scope1,scope2Tco2e:scope2,reportingYear:organization.data.reporting_year,verifiedCalculationShare:calc.length?Math.round(verified/calc.length*100):0,methodologyNote:'Aggregated from current calculation records. Public values are a publication snapshot, not an assurance opinion.'},
+  carbon:{totalTco2e:total,scope1Tco2e:scope1,scope2Tco2e:scope2,scope3Tco2e:scope3,reportingYear:organization.data.reporting_year,verifiedCalculationShare:calc.length?Math.round(verified/calc.length*100):0,methodologyNote:'Aggregated from current calculation records. Public values are a publication snapshot, not an assurance opinion.'},
   esg:{approvedIndicators:approved.length,averageScore:score,compliantIndicators:compliant,complianceShare:approved.length?Math.round(compliant/approved.length*100):0,note:'Includes only organization-approved ESG indicators.'},
   targets:(targets.data??[]).map(row=>({...row,progressPercent:row.current_value===null?null:Math.max(0,Math.min(100,Math.round((n(row.baseline_value)-n(row.current_value))/Math.max(.000001,n(row.baseline_value)-n(row.target_value))*100)))})),
   pathways:pathways.data??[],suppliers:aggregateSupplierReadiness(suppliers.data??[]),

@@ -15,15 +15,12 @@ export default async function handler(req: any, res: any) {
     application = null;
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'no-store');
     return res.end(JSON.stringify({
       error: 'The API failed to initialize.',
       code: 'api_bootstrap_failed',
-      configuration: {
-        supabaseUrl: Boolean(process.env.SUPABASE_URL),
-        supabaseAnonKey: Boolean(process.env.SUPABASE_ANON_KEY),
-        supabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-      },
-      guidance: 'Check the Vercel function log for event api_bootstrap_failed. No secret values are included in this response.',
+      guidance: 'Check the Vercel function log for event api_bootstrap_failed.',
     }));
   }
 }

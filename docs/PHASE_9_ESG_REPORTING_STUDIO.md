@@ -34,7 +34,7 @@ Implemented. Apply `server/migrations/024_esg_reporting_studio.sql` after migrat
 | `PUT /api/reporting/reports/:id/studio` | Save pages, blocks, ordering, and branding |
 | `POST /api/reporting/reports/:id/studio/version` | Create an immutable composition checkpoint |
 | `POST /api/reporting/reports/:id/studio/evidence` | Link governed evidence to a block |
-| `POST /api/reporting/reports/:id/studio/narrative` | Draft a grounded narrative through local Ollama |
+| `POST /api/reporting/reports/:id/studio/narrative` | Draft a grounded narrative through the configured AI provider |
 | `POST /api/reporting/reports/:id/submit-review` | Submit a draft for review |
 | `POST /api/reporting/reports/:id/approvals` | Approve or request changes |
 | `POST /api/reporting/reports/:id/publish` | Publish and lock an approved report |
